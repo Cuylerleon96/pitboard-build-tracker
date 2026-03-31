@@ -3,13 +3,17 @@ import './App.css'
 import { demoWorkspace } from './data/demoWorkspace'
 import {
   cloudEnabled,
+  getProfile,
   getSession,
   loadWorkspace,
-  requestMagicLink,
   saveBuild,
   saveWorkspaceLocal,
+  signInWithGoogle,
+  signInWithPassword,
   signOut,
+  signUpWithPassword,
   subscribeToAuth,
+  upsertProfile,
 } from './lib/dataClient'
 
 const partsStatuses = ['planned', 'quoted', 'ordered', 'received', 'installed', 'blocked']
@@ -108,8 +112,31 @@ function getModelOptions(make) {
   return modelsByMake[make] || modelsByMake.Other
 }
 
-function getRoleStorageKey(userId) {
-  return `pitboard-role-${userId}`
+function getEmptyTechnicianNotes() {
+  return { dashboard: [], parts: [], wiring: [], tunes: [], journal: [] }
+}
+
+const emptyBuild = {
+  id: 'empty-build',
+  slug: 'empty-build',
+  name: 'No build selected',
+  vehicleYear: '',
+  vehicleMake: '',
+  vehicleModel: '',
+  vehicle: '',
+  status: 'Planning',
+  brief: '',
+  nextMilestone: '',
+  portalSummary: '',
+  updatedAt: '',
+  budget: { target: 0 },
+  client: { name: '', email: '', portalStatus: 'Not invited' },
+  phases: [],
+  parts: [],
+  pins: [],
+  tunes: [],
+  technicianNotes: getEmptyTechnicianNotes(),
+  journal: [],
 }
 
 function extractTuneValue(text, key) {
@@ -159,20 +186,66 @@ function TechnicianNotes({ entries, draft, onChange, onSubmit, onDelete, title }
   )
 }
 
-function AuthScreen({ authState, email, onEmailChange, onSubmit }) {
+function AuthScreen({
+  authState,
+  authMode,
+  authForm,
+  authBusy,
+  onAuthFormChange,
+  onGoogleSignIn,
+  onModeChange,
+  onSubmit,
+}) {
   return (
     <div className="workspace-shell auth-shell">
       <div className="auth-panel">
         <div className="eyebrow">BuildPortal</div>
-        <h1>Sign in to access your build tracker.</h1>
+        <h1>Sign in and get into the build.</h1>
         <p>
-          This app is now account-gated. Shop users and customers both sign in here with a magic link, then enter
-          their role-based workspace.
+          Shops and customers can both sign in here. Use email and password right on the page, or continue with Google.
         </p>
+        <div className="auth-tabs">
+          <button className={`auth-tab ${authMode === 'sign-in' ? 'active' : ''}`} onClick={() => onModeChange('sign-in')} type="button">Sign in</button>
+          <button className={`auth-tab ${authMode === 'sign-up' ? 'active' : ''}`} onClick={() => onModeChange('sign-up')} type="button">Create account</button>
+        </div>
+        <form className="stack-form auth-form" onSubmit={onSubmit}>
+          <label>
+            <span className="field-label">Email address</span>
+            <input onChange={(event) => onAuthFormChange('email', event.target.value)} placeholder="name@example.com" type="email" value={authForm.email} />
+          </label>
+          <label>
+            <span className="field-label">Password</span>
+            <input onChange={(event) => onAuthFormChange('password', event.target.value)} placeholder="Enter your password" type="password" value={authForm.password} />
+          </label>
+          {authMode === 'sign-up' ? (
+            <>
+              <label>
+                <span className="field-label">Account type</span>
+                <select onChange={(event) => onAuthFormChange('role', event.target.value)} value={authForm.role}>
+                  {roles.map((roleOption) => <option key={roleOption} value={roleOption}>{roleOption}</option>)}
+                </select>
+              </label>
+              <label>
+                <span className="field-label">Your name</span>
+                <input onChange={(event) => onAuthFormChange('fullName', event.target.value)} placeholder="Your name" value={authForm.fullName} />
+              </label>
+              {authForm.role === 'shop' ? (
+                <label>
+                  <span className="field-label">Shop name</span>
+                  <input onChange={(event) => onAuthFormChange('shopName', event.target.value)} placeholder="Shop name" value={authForm.shopName} />
+                </label>
+              ) : null}
+            </>
+          ) : null}
+          <button className="button primary" disabled={authBusy} type="submit">
+            {authBusy ? 'Working...' : authMode === 'sign-up' ? 'Create account' : 'Sign in'}
+          </button>
+          <button className="button google-button" disabled={authBusy} onClick={onGoogleSignIn} type="button">Continue with Google</button>
+        </form>
         <div className="auth-points">
           <div>
             <strong>First-time setup</strong>
-            <span>Enter an email address and Supabase sends a login link. That also creates the account if it does not exist yet.</span>
+            <span>Create the account here, then finish your role setup inside the app if needed.</span>
           </div>
           <div>
             <strong>Shop access</strong>
@@ -183,16 +256,41 @@ function AuthScreen({ authState, email, onEmailChange, onSubmit }) {
             <span>Customers can use the same sign-in flow and see a simplified workspace.</span>
           </div>
         </div>
-        <form className="stack-form auth-form" onSubmit={onSubmit}>
-          <label>
-            <span className="field-label">Email address</span>
-            <input onChange={(event) => onEmailChange(event.target.value)} placeholder="name@example.com" type="email" value={email} />
-          </label>
-          <button className="button primary" type="submit">Send login link</button>
-        </form>
         <div className="auth-status">
           {authState.status === 'loading' ? 'Checking session...' : 'Signed out'}
         </div>
+      </div>
+    </div>
+  )
+}
+
+function ProfileSetupScreen({ authBusy, authForm, onChange, onSubmit, userEmail }) {
+  return (
+    <div className="workspace-shell auth-shell">
+      <div className="auth-panel">
+        <div className="eyebrow">BuildPortal</div>
+        <h1>Finish your account setup.</h1>
+        <p>This only takes a moment. Pick whether this account is for the shop or for a customer login, then save it.</p>
+        <div className="auth-status">Signed in as {userEmail}</div>
+        <form className="stack-form auth-form" onSubmit={onSubmit}>
+          <label>
+            <span className="field-label">Account type</span>
+            <select onChange={(event) => onChange('role', event.target.value)} value={authForm.role}>
+              {roles.map((roleOption) => <option key={roleOption} value={roleOption}>{roleOption}</option>)}
+            </select>
+          </label>
+          <label>
+            <span className="field-label">Your name</span>
+            <input onChange={(event) => onChange('fullName', event.target.value)} placeholder="Your name" value={authForm.fullName} />
+          </label>
+          {authForm.role === 'shop' ? (
+            <label>
+              <span className="field-label">Shop name</span>
+              <input onChange={(event) => onChange('shopName', event.target.value)} placeholder="Shop name" value={authForm.shopName} />
+            </label>
+          ) : null}
+          <button className="button primary" disabled={authBusy} type="submit">{authBusy ? 'Saving...' : 'Save account setup'}</button>
+        </form>
       </div>
     </div>
   )
@@ -204,7 +302,16 @@ function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [notice, setNotice] = useState('')
   const [authState, setAuthState] = useState({ status: cloudEnabled ? 'loading' : 'demo', session: null })
-  const [email, setEmail] = useState('')
+  const [profile, setProfile] = useState(null)
+  const [authMode, setAuthMode] = useState('sign-in')
+  const [authBusy, setAuthBusy] = useState(false)
+  const [authForm, setAuthForm] = useState({
+    email: '',
+    password: '',
+    role: 'shop',
+    fullName: '',
+    shopName: '',
+  })
   const [role, setRole] = useState('shop')
   const [partsQuery, setPartsQuery] = useState('')
   const [partsFilter, setPartsFilter] = useState('all')
@@ -221,19 +328,36 @@ function App() {
   useEffect(() => {
     let ignore = false
 
+    async function hydrateCloudSession(session) {
+      if (!session?.user || ignore) return
+
+      const [cloudWorkspace, nextProfile] = await Promise.all([
+        loadWorkspace(session.user.id),
+        getProfile(session.user.id),
+      ])
+
+      if (ignore) return
+
+      setWorkspace(cloudWorkspace)
+      setActiveBuildId(cloudWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
+      setProfile(nextProfile)
+      setRole(nextProfile?.role || 'shop')
+      setAuthForm((current) => ({
+        ...current,
+        email: session.user.email || current.email,
+        fullName: nextProfile?.full_name || current.fullName,
+        shopName: nextProfile?.shop_name || current.shopName,
+        role: nextProfile?.role || current.role,
+      }))
+      setAuthState({ status: nextProfile ? 'cloud' : 'setup', session })
+    }
+
     async function boot() {
       const session = await getSession()
       if (ignore) return
 
       if (session) {
-        setAuthState({ status: 'cloud', session })
-        const storedRole = window.localStorage.getItem(getRoleStorageKey(session.user.id))
-        if (storedRole && roles.includes(storedRole)) setRole(storedRole)
-        const cloudWorkspace = await loadWorkspace(session.user.id)
-        if (!ignore) {
-          setWorkspace(cloudWorkspace)
-          setActiveBuildId(cloudWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
-        }
+        await hydrateCloudSession(session)
         return
       }
 
@@ -242,6 +366,7 @@ function App() {
         setWorkspace(localWorkspace)
         setActiveBuildId(localWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
         setAuthState({ status: cloudEnabled ? 'signed-out' : 'demo', session: null })
+        setProfile(null)
         setRole('shop')
       }
     }
@@ -250,12 +375,7 @@ function App() {
 
     const subscription = subscribeToAuth(async (session) => {
       if (session?.user) {
-        setAuthState({ status: 'cloud', session })
-        const storedRole = window.localStorage.getItem(getRoleStorageKey(session.user.id))
-        setRole(storedRole && roles.includes(storedRole) ? storedRole : 'shop')
-        const cloudWorkspace = await loadWorkspace(session.user.id)
-        setWorkspace(cloudWorkspace)
-        setActiveBuildId(cloudWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
+        await hydrateCloudSession(session)
         setNotice('Cloud session connected.')
         return
       }
@@ -264,6 +384,8 @@ function App() {
       setWorkspace(localWorkspace)
       setActiveBuildId(localWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
       setAuthState({ status: cloudEnabled ? 'signed-out' : 'demo', session: null })
+      setProfile(null)
+      setAuthForm((current) => ({ ...current, password: '' }))
       setRole('shop')
     })
 
@@ -280,7 +402,7 @@ function App() {
   }, [notice])
 
   const activeBuild = useMemo(
-    () => workspace.builds.find((build) => build.id === activeBuildId) ?? workspace.builds[0],
+    () => workspace.builds.find((build) => build.id === activeBuildId) ?? workspace.builds[0] ?? emptyBuild,
     [activeBuildId, workspace.builds],
   )
 
@@ -444,7 +566,7 @@ function App() {
       parts: [],
       pins: [],
       tunes: [],
-      technicianNotes: { dashboard: [], parts: [], wiring: [], tunes: [], journal: [] },
+      technicianNotes: getEmptyTechnicianNotes(),
       journal: [{ id: makeId('log'), at: now, text: 'Build created.' }],
     }
 
@@ -650,11 +772,101 @@ function App() {
     }))
   }
 
-  async function handleMagicLink(event) {
+  function updateAuthForm(field, value) {
+    setAuthForm((current) => ({ ...current, [field]: value }))
+  }
+
+  async function persistProfile(overrides = {}) {
+    const user = authState.session?.user
+    if (!user) return { ok: false, message: 'No active session found.' }
+
+    const nextProfile = {
+      id: user.id,
+      role: overrides.role || authForm.role,
+      full_name: (overrides.fullName ?? authForm.fullName).trim(),
+      shop_name: (overrides.shopName ?? authForm.shopName).trim(),
+    }
+
+    const result = await upsertProfile(nextProfile)
+    if (!result.ok) return result
+
+    setProfile(nextProfile)
+    setRole(nextProfile.role)
+    setAuthState((current) => ({ ...current, status: 'cloud' }))
+    setAuthForm((current) => ({
+      ...current,
+      fullName: nextProfile.full_name,
+      shopName: nextProfile.shop_name,
+      role: nextProfile.role,
+    }))
+    return { ok: true }
+  }
+
+  async function handleAuthSubmit(event) {
     event.preventDefault()
-    if (!email.trim()) return
-    const result = await requestMagicLink(email.trim())
-    setNotice(result.ok ? 'Magic link sent. Check your email.' : result.message)
+
+    const email = authForm.email.trim()
+    const password = authForm.password
+    if (!email || !password) {
+      setNotice('Enter both email and password.')
+      return
+    }
+
+    setAuthBusy(true)
+
+    try {
+      if (authMode === 'sign-up') {
+        const signUpResult = await signUpWithPassword(email, password)
+        if (!signUpResult.ok) {
+          setNotice(signUpResult.message)
+          return
+        }
+
+        const signInResult = await signInWithPassword(email, password)
+        if (!signInResult.ok) {
+          setNotice(signInResult.message)
+          return
+        }
+
+        setNotice('Account created. Finish your setup below.')
+        return
+      }
+
+      const signInResult = await signInWithPassword(email, password)
+      setNotice(signInResult.ok ? 'Signed in.' : signInResult.message)
+    } finally {
+      setAuthBusy(false)
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setAuthBusy(true)
+    try {
+      const result = await signInWithGoogle()
+      if (!result.ok) setNotice(result.message)
+    } finally {
+      setAuthBusy(false)
+    }
+  }
+
+  async function handleProfileSetup(event) {
+    event.preventDefault()
+    if (!authForm.fullName.trim()) {
+      setNotice('Add a name to finish setup.')
+      return
+    }
+    if (authForm.role === 'shop' && !authForm.shopName.trim()) {
+      setNotice('Add a shop name for the shop account.')
+      return
+    }
+
+    setAuthBusy(true)
+    try {
+      const result = await persistProfile()
+      setNotice(result.ok ? 'Account setup saved.' : result.message)
+    } finally {
+      setAuthBusy(false)
+    }
   }
 
   async function handleSignOut() {
@@ -662,27 +874,59 @@ function App() {
     setNotice('Signed out.')
   }
 
-  function updateRole(nextRole) {
+  async function updateRole(nextRole) {
     setRole(nextRole)
-    if (authState.session?.user) {
-      window.localStorage.setItem(getRoleStorageKey(authState.session.user.id), nextRole)
-    }
     if (nextRole === 'customer' && ['builds'].includes(activeTab)) {
       setActiveTab('dashboard')
     }
+
+    if (authState.status === 'cloud' && authState.session?.user) {
+      const result = await persistProfile({ role: nextRole })
+      setNotice(result.ok ? `Role set to ${nextRole}.` : result.message)
+      return
+    }
+
     setNotice(`Role set to ${nextRole}.`)
   }
 
   const visibleTabs = role === 'customer' ? customerTabs : tabs
   const isShop = role === 'shop'
 
-  if (cloudEnabled && authState.status !== 'cloud') {
+  if (cloudEnabled && authState.status === 'loading') {
+    return (
+      <div className="workspace-shell auth-shell">
+        <div className="auth-panel">
+          <div className="eyebrow">BuildPortal</div>
+          <h1>Checking your session.</h1>
+          <div className="auth-status">Loading account data...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (cloudEnabled && authState.status === 'signed-out') {
     return (
       <AuthScreen
         authState={authState}
-        email={email}
-        onEmailChange={setEmail}
-        onSubmit={handleMagicLink}
+        authBusy={authBusy}
+        authForm={authForm}
+        authMode={authMode}
+        onAuthFormChange={updateAuthForm}
+        onGoogleSignIn={handleGoogleSignIn}
+        onModeChange={setAuthMode}
+        onSubmit={handleAuthSubmit}
+      />
+    )
+  }
+
+  if (cloudEnabled && authState.status === 'setup') {
+    return (
+      <ProfileSetupScreen
+        authBusy={authBusy}
+        authForm={authForm}
+        onChange={updateAuthForm}
+        onSubmit={handleProfileSetup}
+        userEmail={authState.session?.user?.email || authForm.email}
       />
     )
   }
@@ -700,9 +944,9 @@ function App() {
           </div>
           <div className="header-actions">
             <button className="button ghost" onClick={() => startTransition(() => setActiveTab('settings'))}>
-              Account setup
+              Account
             </button>
-            <button className="button primary" onClick={() => startTransition(() => setActiveTab('builds'))}>
+            <button className="button primary" disabled={!isShop} onClick={() => startTransition(() => setActiveTab('builds'))}>
               New build
             </button>
           </div>
@@ -732,6 +976,13 @@ function App() {
 
       <main className="main-area">
         {notice && <div className="notice">{notice}</div>}
+        {workspace.builds.length === 0 && activeTab !== 'settings' ? (
+          <div className="notice">
+            {isShop
+              ? 'This account does not have any builds yet. Open the Builds tab to create the first one.'
+              : 'No builds are linked to this customer account yet. Ask the shop to set your email on a build.'}
+          </div>
+        ) : null}
 
         {activeTab === 'dashboard' && (
           <section className="page-section">
@@ -1084,10 +1335,7 @@ function App() {
               <article className="card">
                 <div className="card-title">Account and role</div>
                 <div className="settings-copy account-screen">
-                  <p>
-                    This app now requires sign-in before entering the tracker. The signed-in account below is the one
-                    currently using the workspace.
-                  </p>
+                  <p>The signed-in account below is the one using this workspace. Shop users can edit everything. Customer users get the cleaner read-only portal view.</p>
                   {authState.status === 'cloud' && (
                     <div className="stack-form">
                       <div className="info-line">Signed in as {authState.session.user.email}</div>
@@ -1097,9 +1345,20 @@ function App() {
                           {roles.map((roleOption) => <option key={roleOption} value={roleOption}>{roleOption}</option>)}
                         </select>
                       </label>
+                      <label>
+                        <span className="field-label">Your name</span>
+                        <input onChange={(event) => updateAuthForm('fullName', event.target.value)} value={authForm.fullName} />
+                      </label>
+                      {role === 'shop' ? (
+                        <label>
+                          <span className="field-label">Shop name</span>
+                          <input onChange={(event) => updateAuthForm('shopName', event.target.value)} value={authForm.shopName} />
+                        </label>
+                      ) : null}
                       <div className="info-line">
-                        `shop` can manage everything. `customer` gets a simplified, read-oriented workspace.
+                        Google sign-in is available from the account screen, and email/password sign-in happens directly in the app instead of through emailed links.
                       </div>
+                      <button className="button primary" disabled={authBusy} onClick={() => persistProfile().then((result) => setNotice(result.ok ? 'Account details saved.' : result.message))}>Save account details</button>
                       <button className="button ghost" onClick={handleSignOut}>Sign out</button>
                     </div>
                   )}

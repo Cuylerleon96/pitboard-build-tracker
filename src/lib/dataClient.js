@@ -57,6 +57,38 @@ export async function requestMagicLink(email) {
   return { ok: true }
 }
 
+export async function signInWithPassword(email, password) {
+  if (!supabase) return { ok: false, message: 'Supabase is not configured yet.' }
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) return { ok: false, message: error.message }
+  return { ok: true }
+}
+
+export async function signUpWithPassword(email, password) {
+  if (!supabase) return { ok: false, message: 'Supabase is not configured yet.' }
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: window.location.origin,
+    },
+  })
+  if (error) return { ok: false, message: error.message }
+  return { ok: true }
+}
+
+export async function signInWithGoogle() {
+  if (!supabase) return { ok: false, message: 'Supabase is not configured yet.' }
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin,
+    },
+  })
+  if (error) return { ok: false, message: error.message }
+  return { ok: true }
+}
+
 export async function signOut() {
   if (!supabase) return
   await supabase.auth.signOut()
@@ -67,7 +99,6 @@ export async function loadWorkspace(userId) {
     const { data, error } = await supabase
       .from('builds')
       .select('*')
-      .eq('owner_id', userId)
       .order('updated_at', { ascending: false })
 
     if (!error && data?.length) {
@@ -77,6 +108,9 @@ export async function loadWorkspace(userId) {
           id: row.id,
           slug: row.slug,
           name: row.name,
+          vehicleYear: row.data?.vehicleYear ?? '',
+          vehicleMake: row.data?.vehicleMake ?? '',
+          vehicleModel: row.data?.vehicleModel ?? '',
           vehicle: row.vehicle,
           status: row.status,
           brief: row.brief,
@@ -89,6 +123,13 @@ export async function loadWorkspace(userId) {
           parts: row.data?.parts ?? [],
           pins: row.data?.pins ?? [],
           tunes: row.data?.tunes ?? [],
+          technicianNotes: row.data?.technicianNotes ?? {
+            dashboard: [],
+            parts: [],
+            wiring: [],
+            tunes: [],
+            journal: [],
+          },
           journal: row.data?.journal ?? [],
         })),
       }
@@ -115,6 +156,23 @@ export function saveWorkspaceLocal(workspace) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace))
 }
 
+export async function getProfile(userId) {
+  if (!supabase || !userId) return null
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+  if (error) return null
+  return data
+}
+
+export async function upsertProfile(profile) {
+  if (!supabase) return { ok: false, message: 'Supabase is not configured yet.' }
+  const { error } = await supabase.from('profiles').upsert({
+    ...profile,
+    updated_at: new Date().toISOString(),
+  })
+  if (error) return { ok: false, message: error.message }
+  return { ok: true }
+}
+
 export async function saveBuild(build, userId) {
   if (!supabase || !userId) return
 
@@ -132,10 +190,20 @@ export async function saveBuild(build, userId) {
     client: build.client,
     updated_at: new Date().toISOString(),
     data: {
+      vehicleYear: build.vehicleYear || '',
+      vehicleMake: build.vehicleMake || '',
+      vehicleModel: build.vehicleModel || '',
       phases: build.phases,
       parts: build.parts,
       pins: build.pins,
       tunes: build.tunes,
+      technicianNotes: build.technicianNotes || {
+        dashboard: [],
+        parts: [],
+        wiring: [],
+        tunes: [],
+        journal: [],
+      },
       journal: build.journal,
     },
   })
