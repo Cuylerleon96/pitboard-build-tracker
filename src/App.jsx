@@ -4,7 +4,9 @@ import { demoWorkspace } from './data/demoWorkspace'
 import {
   cloudEnabled,
   getProfile,
+  getHasShopAdmin,
   getSession,
+  listProfiles,
   loadWorkspace,
   saveBuild,
   saveWorkspaceLocal,
@@ -13,6 +15,7 @@ import {
   signOut,
   signUpWithPassword,
   subscribeToAuth,
+  updateProfileByAdmin,
   upsertProfile,
 } from './lib/dataClient'
 
@@ -116,6 +119,10 @@ function getEmptyTechnicianNotes() {
   return { dashboard: [], parts: [], wiring: [], tunes: [], journal: [] }
 }
 
+function getAuthDisplayName(user) {
+  return user?.user_metadata?.full_name || user?.user_metadata?.name || ''
+}
+
 const emptyBuild = {
   id: 'empty-build',
   slug: 'empty-build',
@@ -191,6 +198,7 @@ function AuthScreen({
   authMode,
   authForm,
   authBusy,
+  hasShopAdmin,
   onAuthFormChange,
   onGoogleSignIn,
   onModeChange,
@@ -221,15 +229,20 @@ function AuthScreen({
             <>
               <label>
                 <span className="field-label">Account type</span>
-                <select onChange={(event) => onAuthFormChange('role', event.target.value)} value={authForm.role}>
+                <select disabled={hasShopAdmin} onChange={(event) => onAuthFormChange('role', event.target.value)} value={hasShopAdmin ? 'customer' : authForm.role}>
                   {roles.map((roleOption) => <option key={roleOption} value={roleOption}>{roleOption}</option>)}
                 </select>
               </label>
+              {hasShopAdmin ? (
+                <div className="info-line">
+                  A shop admin already exists. New self-serve signups start as customer accounts and can be promoted by an admin later.
+                </div>
+              ) : null}
               <label>
                 <span className="field-label">Your name</span>
                 <input onChange={(event) => onAuthFormChange('fullName', event.target.value)} placeholder="Your name" value={authForm.fullName} />
               </label>
-              {authForm.role === 'shop' ? (
+              {!hasShopAdmin && authForm.role === 'shop' ? (
                 <label>
                   <span className="field-label">Shop name</span>
                   <input onChange={(event) => onAuthFormChange('shopName', event.target.value)} placeholder="Shop name" value={authForm.shopName} />
@@ -264,7 +277,7 @@ function AuthScreen({
   )
 }
 
-function ProfileSetupScreen({ authBusy, authForm, onChange, onSubmit, userEmail }) {
+function ProfileSetupScreen({ authBusy, authForm, hasShopAdmin, onChange, onSubmit, userEmail }) {
   return (
     <div className="workspace-shell auth-shell">
       <div className="auth-panel">
@@ -275,15 +288,20 @@ function ProfileSetupScreen({ authBusy, authForm, onChange, onSubmit, userEmail 
         <form className="stack-form auth-form" onSubmit={onSubmit}>
           <label>
             <span className="field-label">Account type</span>
-            <select onChange={(event) => onChange('role', event.target.value)} value={authForm.role}>
+            <select disabled={hasShopAdmin} onChange={(event) => onChange('role', event.target.value)} value={hasShopAdmin ? 'customer' : authForm.role}>
               {roles.map((roleOption) => <option key={roleOption} value={roleOption}>{roleOption}</option>)}
             </select>
           </label>
+          {hasShopAdmin ? (
+            <div className="info-line">
+              This project already has a shop admin. Finish setup as a customer account, then an admin can promote you if needed.
+            </div>
+          ) : null}
           <label>
             <span className="field-label">Your name</span>
             <input onChange={(event) => onChange('fullName', event.target.value)} placeholder="Your name" value={authForm.fullName} />
           </label>
-          {authForm.role === 'shop' ? (
+          {!hasShopAdmin && authForm.role === 'shop' ? (
             <label>
               <span className="field-label">Shop name</span>
               <input onChange={(event) => onChange('shopName', event.target.value)} placeholder="Shop name" value={authForm.shopName} />
@@ -296,6 +314,43 @@ function ProfileSetupScreen({ authBusy, authForm, onChange, onSubmit, userEmail 
   )
 }
 
+function TeamAdminCard({ authBusy, onPromote, onRefresh, profiles }) {
+  return (
+    <article className="card">
+      <div className="card-toolbar">
+        <div className="card-title">Team admin</div>
+        <button className="button small subtle" disabled={authBusy} onClick={onRefresh}>Refresh</button>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Email</th><th>Name</th><th>Role</th><th>Admin</th><th /></tr>
+          </thead>
+          <tbody>
+            {profiles.length === 0 ? (
+              <tr><td className="empty-cell" colSpan="5">No team accounts found yet.</td></tr>
+            ) : profiles.map((teamMember) => (
+              <tr key={teamMember.id}>
+                <td>{teamMember.email || '-'}</td>
+                <td>{teamMember.full_name || '-'}</td>
+                <td>{teamMember.role}</td>
+                <td>{teamMember.is_admin ? 'Yes' : 'No'}</td>
+                <td>
+                  <div className="row-actions">
+                    <button className="button small subtle" disabled={authBusy || teamMember.role === 'shop'} onClick={() => onPromote(teamMember, { role: 'shop' })}>Make shop</button>
+                    <button className="button small subtle" disabled={authBusy || teamMember.role === 'customer'} onClick={() => onPromote(teamMember, { role: 'customer', is_admin: false })}>Make customer</button>
+                    <button className="button small subtle" disabled={authBusy || teamMember.is_admin} onClick={() => onPromote(teamMember, { is_admin: true, role: 'shop' })}>Make admin</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  )
+}
+
 function App() {
   const [workspace, setWorkspace] = useState(() => cloneWorkspace(demoWorkspace))
   const [activeBuildId, setActiveBuildId] = useState(demoWorkspace.builds[0].id)
@@ -303,6 +358,8 @@ function App() {
   const [notice, setNotice] = useState('')
   const [authState, setAuthState] = useState({ status: cloudEnabled ? 'loading' : 'demo', session: null })
   const [profile, setProfile] = useState(null)
+  const [hasShopAdmin, setHasShopAdmin] = useState(false)
+  const [teamProfiles, setTeamProfiles] = useState([])
   const [authMode, setAuthMode] = useState('sign-in')
   const [authBusy, setAuthBusy] = useState(false)
   const [authForm, setAuthForm] = useState({
@@ -328,12 +385,23 @@ function App() {
   useEffect(() => {
     let ignore = false
 
+    async function refreshTeamProfiles(nextProfile) {
+      if (!nextProfile?.is_admin) {
+        setTeamProfiles([])
+        return
+      }
+
+      const profiles = await listProfiles()
+      if (!ignore) setTeamProfiles(profiles)
+    }
+
     async function hydrateCloudSession(session) {
       if (!session?.user || ignore) return
 
-      const [cloudWorkspace, nextProfile] = await Promise.all([
+      const [cloudWorkspace, nextProfile, nextHasShopAdmin] = await Promise.all([
         loadWorkspace(session.user.id),
         getProfile(session.user.id),
+        getHasShopAdmin(),
       ])
 
       if (ignore) return
@@ -341,15 +409,17 @@ function App() {
       setWorkspace(cloudWorkspace)
       setActiveBuildId(cloudWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
       setProfile(nextProfile)
+      setHasShopAdmin(nextHasShopAdmin)
       setRole(nextProfile?.role || 'shop')
       setAuthForm((current) => ({
         ...current,
         email: session.user.email || current.email,
-        fullName: nextProfile?.full_name || current.fullName,
+        fullName: nextProfile?.full_name || getAuthDisplayName(session.user) || current.fullName,
         shopName: nextProfile?.shop_name || current.shopName,
         role: nextProfile?.role || current.role,
       }))
       setAuthState({ status: nextProfile ? 'cloud' : 'setup', session })
+      await refreshTeamProfiles(nextProfile)
     }
 
     async function boot() {
@@ -361,12 +431,14 @@ function App() {
         return
       }
 
-      const localWorkspace = await loadWorkspace()
+      const [localWorkspace, nextHasShopAdmin] = await Promise.all([loadWorkspace(), getHasShopAdmin()])
       if (!ignore) {
         setWorkspace(localWorkspace)
         setActiveBuildId(localWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
         setAuthState({ status: cloudEnabled ? 'signed-out' : 'demo', session: null })
         setProfile(null)
+        setHasShopAdmin(nextHasShopAdmin)
+        setTeamProfiles([])
         setRole('shop')
       }
     }
@@ -380,11 +452,13 @@ function App() {
         return
       }
 
-      const localWorkspace = await loadWorkspace()
+      const [localWorkspace, nextHasShopAdmin] = await Promise.all([loadWorkspace(), getHasShopAdmin()])
       setWorkspace(localWorkspace)
       setActiveBuildId(localWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
       setAuthState({ status: cloudEnabled ? 'signed-out' : 'demo', session: null })
       setProfile(null)
+      setHasShopAdmin(nextHasShopAdmin)
+      setTeamProfiles([])
       setAuthForm((current) => ({ ...current, password: '' }))
       setRole('shop')
     })
@@ -400,6 +474,12 @@ function App() {
     const timeout = window.setTimeout(() => setNotice(''), 2800)
     return () => window.clearTimeout(timeout)
   }, [notice])
+
+  useEffect(() => {
+    if (hasShopAdmin && !profile && authForm.role !== 'customer') {
+      setAuthForm((current) => ({ ...current, role: 'customer' }))
+    }
+  }, [authForm.role, hasShopAdmin, profile])
 
   const activeBuild = useMemo(
     () => workspace.builds.find((build) => build.id === activeBuildId) ?? workspace.builds[0] ?? emptyBuild,
@@ -780,9 +860,15 @@ function App() {
     const user = authState.session?.user
     if (!user) return { ok: false, message: 'No active session found.' }
 
+    const nextRole = overrides.role || authForm.role
+    const bootstrappingFirstShopAdmin = !hasShopAdmin && !profile && nextRole === 'shop'
+    const currentIsAdmin = profile?.is_admin || false
+
     const nextProfile = {
       id: user.id,
-      role: overrides.role || authForm.role,
+      email: user.email || authForm.email.trim(),
+      role: nextRole,
+      is_admin: overrides.isAdmin ?? (bootstrappingFirstShopAdmin ? true : currentIsAdmin),
       full_name: (overrides.fullName ?? authForm.fullName).trim(),
       shop_name: (overrides.shopName ?? authForm.shopName).trim(),
     }
@@ -792,13 +878,19 @@ function App() {
 
     setProfile(nextProfile)
     setRole(nextProfile.role)
+    setHasShopAdmin((current) => current || nextProfile.is_admin)
     setAuthState((current) => ({ ...current, status: 'cloud' }))
     setAuthForm((current) => ({
       ...current,
+      email: nextProfile.email,
       fullName: nextProfile.full_name,
       shopName: nextProfile.shop_name,
       role: nextProfile.role,
     }))
+    if (nextProfile.is_admin) {
+      const profiles = await listProfiles()
+      setTeamProfiles(profiles)
+    }
     return { ok: true }
   }
 
@@ -816,6 +908,11 @@ function App() {
 
     try {
       if (authMode === 'sign-up') {
+        if (hasShopAdmin && authForm.role === 'shop') {
+          setNotice('A shop admin already exists. Create this account as a customer, then promote it from the admin panel.')
+          return
+        }
+
         const signUpResult = await signUpWithPassword(email, password)
         if (!signUpResult.ok) {
           setNotice(signUpResult.message)
@@ -859,6 +956,10 @@ function App() {
       setNotice('Add a shop name for the shop account.')
       return
     }
+    if (hasShopAdmin && authForm.role === 'shop' && !profile?.is_admin) {
+      setNotice('This account cannot self-assign as shop. Ask a shop admin to promote it.')
+      return
+    }
 
     setAuthBusy(true)
     try {
@@ -874,14 +975,51 @@ function App() {
     setNotice('Signed out.')
   }
 
+  async function refreshTeamProfiles() {
+    if (!isAdmin) return
+    const profiles = await listProfiles()
+    setTeamProfiles(profiles)
+  }
+
+  async function promoteProfile(teamMember, overrides) {
+    if (!isAdmin) {
+      setNotice('Only a shop admin can manage team accounts.')
+      return
+    }
+
+    setAuthBusy(true)
+    try {
+      const nextProfile = {
+        ...teamMember,
+        ...overrides,
+      }
+
+      const result = await updateProfileByAdmin(nextProfile)
+      if (!result.ok) {
+        setNotice(result.message)
+        return
+      }
+
+      await refreshTeamProfiles()
+      setNotice(`Updated ${teamMember.email || teamMember.full_name || 'account'}.`)
+    } finally {
+      setAuthBusy(false)
+    }
+  }
+
   async function updateRole(nextRole) {
+    if (!profile?.is_admin) {
+      setNotice('Only a shop admin can change account roles.')
+      return
+    }
+
     setRole(nextRole)
     if (nextRole === 'customer' && ['builds'].includes(activeTab)) {
       setActiveTab('dashboard')
     }
 
     if (authState.status === 'cloud' && authState.session?.user) {
-      const result = await persistProfile({ role: nextRole })
+      const result = await persistProfile({ role: nextRole, isAdmin: nextRole === 'shop' ? profile?.is_admin : false })
       setNotice(result.ok ? `Role set to ${nextRole}.` : result.message)
       return
     }
@@ -891,6 +1029,7 @@ function App() {
 
   const visibleTabs = role === 'customer' ? customerTabs : tabs
   const isShop = role === 'shop'
+  const isAdmin = Boolean(profile?.is_admin)
 
   if (cloudEnabled && authState.status === 'loading') {
     return (
@@ -911,6 +1050,7 @@ function App() {
         authBusy={authBusy}
         authForm={authForm}
         authMode={authMode}
+        hasShopAdmin={hasShopAdmin}
         onAuthFormChange={updateAuthForm}
         onGoogleSignIn={handleGoogleSignIn}
         onModeChange={setAuthMode}
@@ -924,6 +1064,7 @@ function App() {
       <ProfileSetupScreen
         authBusy={authBusy}
         authForm={authForm}
+        hasShopAdmin={hasShopAdmin}
         onChange={updateAuthForm}
         onSubmit={handleProfileSetup}
         userEmail={authState.session?.user?.email || authForm.email}
@@ -1339,12 +1480,7 @@ function App() {
                   {authState.status === 'cloud' && (
                     <div className="stack-form">
                       <div className="info-line">Signed in as {authState.session.user.email}</div>
-                      <label>
-                        <span className="field-label">Workspace role</span>
-                        <select onChange={(event) => updateRole(event.target.value)} value={role}>
-                          {roles.map((roleOption) => <option key={roleOption} value={roleOption}>{roleOption}</option>)}
-                        </select>
-                      </label>
+                      <div className="info-line">Role: {role}{isAdmin ? ' | shop admin' : ''}</div>
                       <label>
                         <span className="field-label">Your name</span>
                         <input onChange={(event) => updateAuthForm('fullName', event.target.value)} value={authForm.fullName} />
@@ -1384,6 +1520,15 @@ function App() {
                 </article>
               )}
             </div>
+
+            {isAdmin ? (
+              <TeamAdminCard
+                authBusy={authBusy}
+                onPromote={promoteProfile}
+                onRefresh={refreshTeamProfiles}
+                profiles={teamProfiles}
+              />
+            ) : null}
 
             {isShop ? (
               <article className="card">

@@ -89,6 +89,13 @@ export async function signInWithGoogle() {
   return { ok: true }
 }
 
+export async function getHasShopAdmin() {
+  if (!supabase) return false
+  const { data, error } = await supabase.rpc('has_shop_admin')
+  if (error) return false
+  return Boolean(data)
+}
+
 export async function signOut() {
   if (!supabase) return
   await supabase.auth.signOut()
@@ -163,12 +170,41 @@ export async function getProfile(userId) {
   return data
 }
 
+export async function listProfiles() {
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: true })
+
+  if (error) return []
+  return data
+}
+
 export async function upsertProfile(profile) {
   if (!supabase) return { ok: false, message: 'Supabase is not configured yet.' }
   const { error } = await supabase.from('profiles').upsert({
     ...profile,
     updated_at: new Date().toISOString(),
   })
+  if (error) return { ok: false, message: error.message }
+  return { ok: true }
+}
+
+export async function updateProfileByAdmin(profile) {
+  if (!supabase) return { ok: false, message: 'Supabase is not configured yet.' }
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      email: profile.email,
+      role: profile.role,
+      is_admin: profile.is_admin,
+      full_name: profile.full_name,
+      shop_name: profile.shop_name,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', profile.id)
+
   if (error) return { ok: false, message: error.message }
   return { ok: true }
 }
