@@ -623,72 +623,96 @@ function App() {
       if (!ignore) setTeamProfiles(profiles)
     }
 
+    function fallbackToSignedOut() {
+      if (ignore) return
+      setAuthState({ status: cloudEnabled ? 'signed-out' : 'demo', session: null })
+      setProfile(null)
+      setHasShopAdmin(false)
+      setTeamProfiles([])
+      setRole('shop')
+    }
+
     async function hydrateCloudSession(session) {
       if (!session?.user || ignore) return
 
-      const [cloudWorkspace, nextProfile, nextHasShopAdmin] = await Promise.all([
-        loadWorkspace(session.user.id),
-        getProfile(session.user.id),
-        getHasShopAdmin(),
-      ])
+      try {
+        const [cloudWorkspace, nextProfile, nextHasShopAdmin] = await Promise.all([
+          loadWorkspace(session.user.id),
+          getProfile(session.user.id),
+          getHasShopAdmin(),
+        ])
 
-      if (ignore) return
+        if (ignore) return
 
-      setWorkspace(cloudWorkspace)
-      setActiveBuildId(cloudWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
-      setProfile(nextProfile)
-      setHasShopAdmin(nextHasShopAdmin)
-      setRole(nextProfile?.role || 'shop')
-      setAuthForm((current) => ({
-        ...current,
-        email: session.user.email || current.email,
-        fullName: nextProfile?.full_name || getAuthDisplayName(session.user) || current.fullName,
-        shopName: nextProfile?.shop_name || current.shopName,
-        role: nextProfile?.role || current.role,
-      }))
-      setAuthState({ status: nextProfile ? 'cloud' : 'setup', session })
-      await refreshTeamProfiles(nextProfile)
+        setWorkspace(cloudWorkspace)
+        setActiveBuildId(cloudWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
+        setProfile(nextProfile)
+        setHasShopAdmin(nextHasShopAdmin)
+        setRole(nextProfile?.role || 'shop')
+        setAuthForm((current) => ({
+          ...current,
+          email: session.user.email || current.email,
+          fullName: nextProfile?.full_name || getAuthDisplayName(session.user) || current.fullName,
+          shopName: nextProfile?.shop_name || current.shopName,
+          role: nextProfile?.role || current.role,
+        }))
+        setAuthState({ status: nextProfile ? 'cloud' : 'setup', session })
+        await refreshTeamProfiles(nextProfile)
+      } catch {
+        fallbackToSignedOut()
+      }
     }
 
     async function boot() {
-      const session = await getSession()
-      if (ignore) return
+      try {
+        const timeout = new Promise((_, reject) =>
+          window.setTimeout(() => reject(new Error('session timeout')), 6000),
+        )
+        const session = await Promise.race([getSession(), timeout])
+        if (ignore) return
 
-      if (session) {
-        await hydrateCloudSession(session)
-        return
-      }
+        if (session) {
+          await hydrateCloudSession(session)
+          return
+        }
 
-      const [localWorkspace, nextHasShopAdmin] = await Promise.all([loadWorkspace(), getHasShopAdmin()])
-      if (!ignore) {
-        setWorkspace(localWorkspace)
-        setActiveBuildId(localWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
-        setAuthState({ status: cloudEnabled ? 'signed-out' : 'demo', session: null })
-        setProfile(null)
-        setHasShopAdmin(nextHasShopAdmin)
-        setTeamProfiles([])
-        setRole('shop')
+        const [localWorkspace, nextHasShopAdmin] = await Promise.all([loadWorkspace(), getHasShopAdmin()])
+        if (!ignore) {
+          setWorkspace(localWorkspace)
+          setActiveBuildId(localWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
+          setAuthState({ status: cloudEnabled ? 'signed-out' : 'demo', session: null })
+          setProfile(null)
+          setHasShopAdmin(nextHasShopAdmin)
+          setTeamProfiles([])
+          setRole('shop')
+        }
+      } catch {
+        fallbackToSignedOut()
       }
     }
 
     boot()
 
     const subscription = subscribeToAuth(async (session) => {
-      if (session?.user) {
-        await hydrateCloudSession(session)
-        setNotice('Cloud session connected.')
-        return
-      }
+      try {
+        if (session?.user) {
+          await hydrateCloudSession(session)
+          setNotice('Cloud session connected.')
+          return
+        }
 
-      const [localWorkspace, nextHasShopAdmin] = await Promise.all([loadWorkspace(), getHasShopAdmin()])
-      setWorkspace(localWorkspace)
-      setActiveBuildId(localWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
-      setAuthState({ status: cloudEnabled ? 'signed-out' : 'demo', session: null })
-      setProfile(null)
-      setHasShopAdmin(nextHasShopAdmin)
-      setTeamProfiles([])
-      setAuthForm((current) => ({ ...current, password: '' }))
-      setRole('shop')
+        const [localWorkspace, nextHasShopAdmin] = await Promise.all([loadWorkspace(), getHasShopAdmin()])
+        setWorkspace(localWorkspace)
+        setActiveBuildId(localWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
+        setAuthState({ status: cloudEnabled ? 'signed-out' : 'demo', session: null })
+        setProfile(null)
+        setHasShopAdmin(nextHasShopAdmin)
+        setTeamProfiles([])
+        setAuthForm((current) => ({ ...current, password: '' }))
+        setRole('shop')
+      } catch {
+        // subscription error — leave state as-is
+      }
     })
 
     return () => {
