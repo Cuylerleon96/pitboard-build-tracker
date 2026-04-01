@@ -4,12 +4,14 @@ import './App.css'
 import { demoWorkspace } from './data/demoWorkspace'
 import {
   cloudEnabled,
+  createCheckoutSession,
   deleteBuildFromCloud,
   getProfile,
   getHasShopAdmin,
   getSession,
   listProfiles,
   loadWorkspace,
+  openBillingPortal,
   saveBuild,
   saveWorkspaceLocal,
   signInWithGoogle,
@@ -435,17 +437,28 @@ function TeamAdminCard({ authBusy, onPromote, onRefresh, profiles }) {
       <div className="table-wrap">
         <table>
           <thead>
-            <tr><th>Email</th><th>Name</th><th>Role</th><th>Admin</th><th /></tr>
+            <tr><th>Email</th><th>Name</th><th>Role</th><th>Admin</th><th>Tier</th><th /></tr>
           </thead>
           <tbody>
             {profiles.length === 0 ? (
-              <tr><td className="empty-cell" colSpan="5">No team accounts found yet.</td></tr>
+              <tr><td className="empty-cell" colSpan="6">No team accounts found yet.</td></tr>
             ) : profiles.map((teamMember) => (
               <tr key={teamMember.id}>
                 <td>{teamMember.email || '-'}</td>
                 <td>{teamMember.full_name || '-'}</td>
                 <td>{teamMember.role}</td>
                 <td>{teamMember.is_admin ? 'Yes' : 'No'}</td>
+                <td>
+                  <select
+                    disabled={authBusy}
+                    value={teamMember.tier || 'free'}
+                    onChange={(e) => onPromote(teamMember, { tier: e.target.value })}
+                  >
+                    <option value="free">free</option>
+                    <option value="garage">garage</option>
+                    <option value="shop">shop</option>
+                  </select>
+                </td>
                 <td>
                   <div className="row-actions">
                     <button className="button small subtle" disabled={authBusy || teamMember.role === 'shop'} onClick={() => onPromote(teamMember, { role: 'shop' })}>Make shop</button>
@@ -458,6 +471,51 @@ function TeamAdminCard({ authBusy, onPromote, onRefresh, profiles }) {
           </tbody>
         </table>
       </div>
+    </article>
+  )
+}
+
+const TIER_FEATURES = {
+  free: ['Unlimited builds', 'Parts & wiring tracker', 'Tune log import', 'Customer portal', 'Ads shown in app'],
+  garage: ['Everything in Free', 'No ads', 'Labor & cost tracking'],
+  shop: ['Everything in Garage', 'Full team management', 'Multi-technician labor logs'],
+}
+
+const TIER_LABELS = { free: 'Free', garage: 'Garage', shop: 'Shop' }
+
+function BillingCard({ billingBusy, currentTier, onManage, onUpgrade }) {
+  return (
+    <article className="card">
+      <div className="card-title">Plan &amp; billing</div>
+      <div className="section-grid three billing-tiers">
+        {['free', 'garage', 'shop'].map((tier) => {
+          const isActive = currentTier === tier
+          return (
+            <div key={tier} className={`billing-tier-card${isActive ? ' active' : ''}`}>
+              <div className="billing-tier-name">{TIER_LABELS[tier]}{isActive ? <span className="billing-current-badge">current</span> : null}</div>
+              <ul className="billing-feature-list">
+                {TIER_FEATURES[tier].map((f) => <li key={f}>{f}</li>)}
+              </ul>
+              {tier === 'free' ? null : isActive ? (
+                <button className="button small subtle" disabled={billingBusy} onClick={onManage}>Manage billing</button>
+              ) : (
+                <button
+                  className="button small primary"
+                  disabled={billingBusy || (currentTier === 'shop' && tier === 'garage')}
+                  onClick={() => onUpgrade(tier)}
+                >
+                  {currentTier === 'shop' && tier === 'garage' ? 'Downgrade in portal' : `Upgrade to ${TIER_LABELS[tier]}`}
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      {currentTier !== 'free' ? (
+        <div className="settings-copy" style={{ marginTop: '0.75rem' }}>
+          <button className="button ghost small" disabled={billingBusy} onClick={onManage}>Manage subscription / invoices</button>
+        </div>
+      ) : null}
     </article>
   )
 }
@@ -608,6 +666,7 @@ function App() {
   const [selectedLogChannels, setSelectedLogChannels] = useState([])
   const [pendingLogImport, setPendingLogImport] = useState(null)
   const [techDrafts, setTechDrafts] = useState({ dashboard: '', parts: '', wiring: '', tunes: '', journal: '' })
+  const [billingBusy, setBillingBusy] = useState(false)
   const deferredPartsQuery = useDeferredValue(partsQuery)
   const deferredPinQuery = useDeferredValue(pinQuery)
 
@@ -692,7 +751,20 @@ function App() {
       }
     }
 
-    boot()
+    boot().then(() => {
+      // Handle return from Stripe Checkout
+      const params = new URLSearchParams(window.location.search)
+      const billingResult = params.get('billing')
+      if (billingResult === 'success') {
+        const tier = params.get('tier') || 'paid'
+        setNotice(`You're now on the ${tier} plan. Welcome aboard!`)
+        setActiveTab('settings')
+        window.history.replaceState({}, '', window.location.pathname)
+      } else if (billingResult === 'cancelled') {
+        setNotice('Checkout was cancelled — your plan was not changed.')
+        window.history.replaceState({}, '', window.location.pathname)
+      }
+    })
 
     const subscription = subscribeToAuth(async (session) => {
       try {
@@ -749,7 +821,8 @@ function App() {
 
   const metrics = useMemo(() => getMetrics(activeBuild), [activeBuild])
   const activeShopSnapshot = activeBuild.shopSnapshot || workspace.shop
-  const currentTier = activeShopSnapshot?.tier || workspace.shop.tier || 'free'
+  // Tier is authoritative from the server-side profile; fall back to 'free' for demo/guest mode
+  const currentTier = profile?.tier || 'free'
   const hasGarageTier = ['garage', 'shop'].includes(currentTier)
   const hasShopTier = currentTier === 'shop'
   const shopAccount = role === 'shop'
@@ -1455,6 +1528,32 @@ function App() {
     setTeamProfiles(profiles)
   }
 
+  async function handleUpgrade(tier) {
+    setBillingBusy(true)
+    setNotice('Redirecting to checkout…')
+    try {
+      const result = await createCheckoutSession(tier)
+      if (!result.ok) setNotice(result.message)
+    } catch {
+      setNotice('Could not start checkout. Please try again.')
+    } finally {
+      setBillingBusy(false)
+    }
+  }
+
+  async function handleManageBilling() {
+    setBillingBusy(true)
+    setNotice('Opening billing portal…')
+    try {
+      const result = await openBillingPortal()
+      if (!result.ok) setNotice(result.message)
+    } catch {
+      setNotice('Could not open billing portal. Please try again.')
+    } finally {
+      setBillingBusy(false)
+    }
+  }
+
   async function promoteProfile(teamMember, overrides) {
     if (!isAdmin) {
       setNotice('Only a shop admin can manage team accounts.')
@@ -2114,7 +2213,6 @@ function App() {
                     <label><span className="field-label">App / shop name</span><input onChange={(event) => updateShopField('name', event.target.value)} value={workspace.shop.name} /></label>
                     <label><span className="field-label">Subtitle</span><input onChange={(event) => updateShopField('subtitle', event.target.value)} value={workspace.shop.subtitle} /></label>
                     <label><span className="field-label">Shop email</span><input onChange={(event) => updateShopField('email', event.target.value)} value={workspace.shop.email} /></label>
-                    <label><span className="field-label">Tier</span><select onChange={(event) => updateShopField('tier', event.target.value)} value={workspace.shop.tier || 'free'}>{tiers.map((tier) => <option key={tier} value={tier}>{tier}</option>)}</select></label>
                   </div>
                 </article>
               ) : (
@@ -2127,6 +2225,15 @@ function App() {
                 </article>
               )}
             </div>
+
+            {authState.status === 'cloud' ? (
+              <BillingCard
+                billingBusy={billingBusy}
+                currentTier={currentTier}
+                onManage={handleManageBilling}
+                onUpgrade={handleUpgrade}
+              />
+            ) : null}
 
             {isAdmin ? (
               <TeamAdminCard

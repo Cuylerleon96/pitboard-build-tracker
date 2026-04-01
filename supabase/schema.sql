@@ -7,6 +7,8 @@ create table if not exists public.profiles (
   is_admin boolean not null default false,
   full_name text not null default '',
   shop_name text not null default '',
+  tier text not null default 'free' check (tier in ('free', 'garage', 'shop')),
+  stripe_customer_id text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -15,6 +17,8 @@ alter table public.profiles add column if not exists email text not null default
 alter table public.profiles add column if not exists is_admin boolean not null default false;
 alter table public.profiles add column if not exists full_name text not null default '';
 alter table public.profiles add column if not exists shop_name text not null default '';
+alter table public.profiles add column if not exists tier text not null default 'free' check (tier in ('free', 'garage', 'shop'));
+alter table public.profiles add column if not exists stripe_customer_id text;
 alter table public.profiles add column if not exists created_at timestamptz not null default now();
 alter table public.profiles add column if not exists updated_at timestamptz not null default now();
 
@@ -105,8 +109,11 @@ create policy "users can update their own profile" on public.profiles
 for update using (auth.uid() = id)
 with check (
   auth.uid() = id
+  -- users cannot change their own role, admin status, or billing fields
   and role = (select existing.role from public.profiles as existing where existing.id = auth.uid())
   and is_admin = (select existing.is_admin from public.profiles as existing where existing.id = auth.uid())
+  and tier = (select existing.tier from public.profiles as existing where existing.id = auth.uid())
+  and coalesce(stripe_customer_id, '') = coalesce((select existing.stripe_customer_id from public.profiles as existing where existing.id = auth.uid()), '')
 );
 
 create policy "shop admins can update all profiles" on public.profiles

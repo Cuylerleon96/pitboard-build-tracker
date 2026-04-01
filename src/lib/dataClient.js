@@ -225,11 +225,60 @@ export async function updateProfileByAdmin(profile) {
       is_admin: profile.is_admin,
       full_name: profile.full_name,
       shop_name: profile.shop_name,
+      // Admins can override tier (for comps, trials, etc.)
+      ...(profile.tier !== undefined ? { tier: profile.tier } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq('id', profile.id)
 
   if (error) return { ok: false, message: error.message }
+  return { ok: true }
+}
+
+// Calls the create-checkout-session edge function and redirects to Stripe Checkout
+export async function createCheckoutSession(tier) {
+  if (!supabase) return { ok: false, message: 'Supabase is not configured yet.' }
+
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return { ok: false, message: 'Not signed in.' }
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/create-checkout-session`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ tier }),
+  })
+
+  const json = await res.json()
+  if (!res.ok || !json.url) return { ok: false, message: json.error || 'Failed to start checkout.' }
+
+  // Redirect to Stripe Checkout — control returns via success_url / cancel_url
+  window.location.href = json.url
+  return { ok: true }
+}
+
+// Opens the Stripe Customer Portal so users can manage / cancel their subscription
+export async function openBillingPortal() {
+  if (!supabase) return { ok: false, message: 'Supabase is not configured yet.' }
+
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return { ok: false, message: 'Not signed in.' }
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/billing-portal`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ return_url: window.location.origin }),
+  })
+
+  const json = await res.json()
+  if (!res.ok || !json.url) return { ok: false, message: json.error || 'Could not open billing portal.' }
+
+  window.location.href = json.url
   return { ok: true }
 }
 
