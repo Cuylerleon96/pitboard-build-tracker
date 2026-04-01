@@ -1401,8 +1401,22 @@ function App() {
   }
 
   async function handleSignOut() {
-    await signOut()
-    setNotice('Signed out.')
+    try {
+      await signOut()
+    } catch {
+      // signOut clears the local session regardless; continue resetting state
+    }
+    const [localWorkspace, nextHasShopAdmin] = await Promise.all([loadWorkspace(), getHasShopAdmin()])
+    setWorkspace(localWorkspace)
+    setActiveBuildId(localWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
+    setAuthState({ status: cloudEnabled ? 'signed-out' : 'demo', session: null })
+    setProfile(null)
+    setHasShopAdmin(nextHasShopAdmin)
+    setTeamProfiles([])
+    setAuthForm((current) => ({ ...current, password: '' }))
+    setRole('shop')
+    setPortalMode('shop')
+    window.localStorage.setItem('pitboard-portal-mode', 'shop')
   }
 
   async function refreshTeamProfiles() {
