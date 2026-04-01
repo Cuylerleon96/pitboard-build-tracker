@@ -25,6 +25,24 @@ function clone(data) {
   return JSON.parse(JSON.stringify(data))
 }
 
+function isValidUUID(str) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
+}
+
+// Assign proper UUIDs to any builds that have non-UUID ids (e.g. 'starter-build' or 'build-{uuid}')
+function normalizeWorkspaceBuildIds(ws) {
+  let changed = false
+  const builds = (ws.builds || []).map((b) => {
+    if (!isValidUUID(b.id)) {
+      changed = true
+      return { ...b, id: crypto.randomUUID() }
+    }
+    return b
+  })
+  if (!changed) return ws
+  return { ...ws, builds }
+}
+
 export async function getSession() {
   if (!supabase) return null
   const {
@@ -165,15 +183,21 @@ export async function loadWorkspace(userId) {
 
   const raw = window.localStorage.getItem(STORAGE_KEY)
   if (!raw) {
-    const initial = clone(demoWorkspace)
+    const initial = normalizeWorkspaceBuildIds(clone(demoWorkspace))
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(initial))
     return initial
   }
 
   try {
-    return JSON.parse(raw)
+    const parsed = JSON.parse(raw)
+    const normalized = normalizeWorkspaceBuildIds(parsed)
+    // If any build IDs were migrated, persist the normalized version immediately
+    if (normalized !== parsed) {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
+    }
+    return normalized
   } catch {
-    const initial = clone(demoWorkspace)
+    const initial = normalizeWorkspaceBuildIds(clone(demoWorkspace))
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(initial))
     return initial
   }
@@ -290,7 +314,7 @@ export async function deleteBuildFromCloud(buildId, userId) {
 export async function saveBuild(build, userId) {
   if (!supabase || !userId) return
 
-  await supabase.from('builds').upsert({
+  const { error } = await supabase.from('builds').upsert({
     id: build.id,
     owner_id: userId,
     slug: build.slug,
@@ -324,4 +348,5 @@ export async function saveBuild(build, userId) {
       journal: build.journal,
     },
   })
+  if (error) console.error('[pitboard] saveBuild error:', error.message, error.code)
 }

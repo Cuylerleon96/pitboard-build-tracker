@@ -70,8 +70,8 @@ function cloneWorkspace(data) {
   return JSON.parse(JSON.stringify(data))
 }
 
-function makeId(prefix) {
-  return `${prefix}-${crypto.randomUUID()}`
+function makeId(_prefix) {
+  return crypto.randomUUID()
 }
 
 function slugify(value) {
