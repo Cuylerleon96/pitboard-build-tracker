@@ -70,7 +70,13 @@ $$;
 grant execute on function public.has_shop_admin() to anon, authenticated;
 grant execute on function public.current_user_is_shop_admin() to authenticated;
 
+-- Drop all known policy variants (handles both old simple names and new granular names)
+drop policy if exists "builds_owner_only" on public.builds;
+drop policy if exists "profiles_self" on public.profiles;
+drop policy if exists "profiles_admin_read" on public.profiles;
+drop policy if exists "profiles_admin_write" on public.profiles;
 drop policy if exists "owners can read their builds" on public.builds;
+drop policy if exists "shops and linked customers can read builds" on public.builds;
 drop policy if exists "owners can insert their builds" on public.builds;
 drop policy if exists "owners can update their builds" on public.builds;
 drop policy if exists "owners can delete their builds" on public.builds;
