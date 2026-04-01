@@ -1201,6 +1201,9 @@ function App() {
   function selectPortalMode(nextMode) {
     if (role !== 'shop' && nextMode === 'shop') return
     setPortalMode(nextMode)
+    if (nextMode === 'customer' && !customerTabs.includes(activeTab)) {
+      setActiveTab('dashboard')
+    }
   }
 
   function updateSelectedLogChannel(index, value) {
@@ -1432,26 +1435,6 @@ function App() {
     } finally {
       setAuthBusy(false)
     }
-  }
-
-  async function updateRole(nextRole) {
-    if (!profile?.is_admin) {
-      setNotice('Only a shop admin can change account roles.')
-      return
-    }
-
-    setRole(nextRole)
-    if (nextRole === 'customer' && ['builds'].includes(activeTab)) {
-      setActiveTab('dashboard')
-    }
-
-    if (authState.status === 'cloud' && authState.session?.user) {
-      const result = await persistProfile({ role: nextRole, isAdmin: nextRole === 'shop' ? profile?.is_admin : false })
-      setNotice(result.ok ? `Role set to ${nextRole}.` : result.message)
-      return
-    }
-
-    setNotice(`Role set to ${nextRole}.`)
   }
 
   if (cloudEnabled && authState.status === 'loading') {
