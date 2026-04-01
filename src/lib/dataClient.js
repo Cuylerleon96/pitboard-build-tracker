@@ -106,6 +106,7 @@ export async function loadWorkspace(userId) {
     const { data, error } = await supabase
       .from('builds')
       .select('*')
+      .eq('owner_id', userId)
       .order('updated_at', { ascending: false })
 
     if (!error && data?.length) {
