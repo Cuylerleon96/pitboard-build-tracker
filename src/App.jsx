@@ -4,6 +4,7 @@ import './App.css'
 import { demoWorkspace } from './data/demoWorkspace'
 import {
   cloudEnabled,
+  deleteBuildFromCloud,
   getProfile,
   getHasShopAdmin,
   getSession,
@@ -910,6 +911,11 @@ function App() {
       setActiveBuildId(nextActive)
       setActiveTab('dashboard')
     }
+
+    if (authState.status === 'cloud' && authState.session?.user) {
+      deleteBuildFromCloud(buildId, authState.session.user.id)
+    }
+
     setNotice('Build deleted.')
   }
 

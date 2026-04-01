@@ -203,8 +203,12 @@ export async function listProfiles() {
 
 export async function upsertProfile(profile) {
   if (!supabase) return { ok: false, message: 'Supabase is not configured yet.' }
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, message: 'No active session.' }
+  if (profile.id && profile.id !== user.id) return { ok: false, message: 'Cannot modify another user\'s profile.' }
   const { error } = await supabase.from('profiles').upsert({
     ...profile,
+    id: user.id,
     updated_at: new Date().toISOString(),
   })
   if (error) return { ok: false, message: error.message }
@@ -227,6 +231,11 @@ export async function updateProfileByAdmin(profile) {
 
   if (error) return { ok: false, message: error.message }
   return { ok: true }
+}
+
+export async function deleteBuildFromCloud(buildId, userId) {
+  if (!supabase || !userId || !buildId) return
+  await supabase.from('builds').delete().eq('id', buildId).eq('owner_id', userId)
 }
 
 export async function saveBuild(build, userId) {
