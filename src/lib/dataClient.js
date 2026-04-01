@@ -109,12 +109,18 @@ export async function loadWorkspace(userId) {
       .order('updated_at', { ascending: false })
 
     if (!error && data?.length) {
+      const firstRow = data[0]
       return {
-        shop: { ...demoWorkspace.shop, promise: 'Cloud-synced customer access is enabled.' },
+        shop: {
+          ...demoWorkspace.shop,
+          ...(firstRow.data?.shopSnapshot || {}),
+          promise: 'Cloud-synced customer access is enabled.',
+        },
         builds: data.map((row) => ({
           id: row.id,
           slug: row.slug,
           name: row.name,
+          vehicleType: row.data?.vehicleType ?? 'Truck',
           vehicleYear: row.data?.vehicleYear ?? '',
           vehicleMake: row.data?.vehicleMake ?? '',
           vehicleModel: row.data?.vehicleModel ?? '',
@@ -126,10 +132,23 @@ export async function loadWorkspace(userId) {
           updatedAt: row.updated_at,
           budget: { target: row.budget_target },
           client: row.client,
-          phases: row.data?.phases ?? [],
-          parts: row.data?.parts ?? [],
-          pins: row.data?.pins ?? [],
-          tunes: row.data?.tunes ?? [],
+          phases: row.data?.phases?.map((phase) => ({ blockedOn: '', ...phase })) ?? [],
+          parts: row.data?.parts?.map((part) => ({
+            vendor: '',
+            supplier: '',
+            source: 'Aftermarket',
+            photos: [],
+            ...part,
+          })) ?? [],
+          pins: row.data?.pins?.map((pin) => ({ wireGauge: '', wireColor: '', ...pin })) ?? [],
+          tunes: row.data?.tunes?.map((tune) => ({
+            ecuPlatform: 'Other',
+            tuneType: 'Other',
+            dataLog: null,
+            ...tune,
+          })) ?? [],
+          labor: row.data?.labor ?? [],
+          shopSnapshot: row.data?.shopSnapshot ?? { ...demoWorkspace.shop },
           technicianNotes: row.data?.technicianNotes ?? {
             dashboard: [],
             parts: [],
@@ -137,7 +156,7 @@ export async function loadWorkspace(userId) {
             tunes: [],
             journal: [],
           },
-          journal: row.data?.journal ?? [],
+          journal: row.data?.journal?.map((entry) => ({ photos: [], ...entry })) ?? [],
         })),
       }
     }
@@ -226,6 +245,7 @@ export async function saveBuild(build, userId) {
     client: build.client,
     updated_at: new Date().toISOString(),
     data: {
+      vehicleType: build.vehicleType || 'Truck',
       vehicleYear: build.vehicleYear || '',
       vehicleMake: build.vehicleMake || '',
       vehicleModel: build.vehicleModel || '',
@@ -233,6 +253,8 @@ export async function saveBuild(build, userId) {
       parts: build.parts,
       pins: build.pins,
       tunes: build.tunes,
+      labor: build.labor || [],
+      shopSnapshot: build.shopSnapshot || { ...demoWorkspace.shop },
       technicianNotes: build.technicianNotes || {
         dashboard: [],
         parts: [],
