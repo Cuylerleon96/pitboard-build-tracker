@@ -24,8 +24,9 @@ import {
 } from './lib/dataClient'
 
 const partsStatuses = ['planned', 'quoted', 'ordered', 'received', 'installed', 'blocked']
-const tabs = ['dashboard', 'builds', 'parts', 'wiring', 'tunes', 'labor', 'journal', 'settings']
+const tabs = ['dashboard', 'builds', 'tasks', 'parts', 'wiring', 'tunes', 'labor', 'journal', 'settings']
 const customerTabs = ['dashboard', 'parts', 'wiring', 'tunes', 'journal', 'settings']
+const taskStatuses = ['open', 'in_progress', 'done']
 const roles = ['shop', 'customer']
 const tiers = ['free', 'garage', 'shop']
 const vehicleTypes = ['Car', 'Truck', 'Motorcycle', 'UTV', 'Boat']
@@ -119,9 +120,9 @@ function getMetrics(build) {
 }
 
 function statusClass(status) {
-  if (['installed', 'active', 'approved'].includes(String(status).toLowerCase())) return 'good'
+  if (['installed', 'active', 'approved', 'done'].includes(String(status).toLowerCase())) return 'good'
   if (['blocked', 'on hold'].includes(String(status).toLowerCase())) return 'bad'
-  if (['quoted', 'ordered', 'received', 'testing'].includes(String(status).toLowerCase())) return 'warn'
+  if (['quoted', 'ordered', 'received', 'testing', 'in_progress'].includes(String(status).toLowerCase())) return 'warn'
   return 'neutral'
 }
 
@@ -656,6 +657,9 @@ function App() {
   const [partsFilter, setPartsFilter] = useState('all')
   const [editingPartId, setEditingPartId] = useState(null)
   const [editDraft, setEditDraft] = useState(null)
+  const [newTask, setNewTask] = useState({ title: '', partId: '', deadline: '', details: '', photos: [] })
+  const [expandedTaskId, setExpandedTaskId] = useState(null)
+  const [taskNoteDrafts, setTaskNoteDrafts] = useState({})
   const [pinQuery, setPinQuery] = useState('')
   const [newLog, setNewLog] = useState('')
   const [journalDraftPhotos, setJournalDraftPhotos] = useState([])
@@ -1126,6 +1130,92 @@ function App() {
     setEditingPartId(null)
     setEditDraft(null)
     setNotice('Part updated.')
+  }
+
+  function addTask(event) {
+    event.preventDefault()
+    if (!newTask.title.trim()) return
+    const taskId = makeId('task')
+    updateActiveBuild((build) => ({
+      ...build,
+      tasks: [
+        {
+          id: taskId,
+          title: newTask.title.trim(),
+          partId: newTask.partId || null,
+          deadline: newTask.deadline,
+          details: newTask.details.trim(),
+          notes: '',
+          photos: newTask.photos || [],
+          status: 'open',
+          createdAt: new Date().toISOString(),
+        },
+        ...(build.tasks || []),
+      ],
+      updatedAt: new Date().toISOString(),
+    }))
+    setNewTask({ title: '', partId: '', deadline: '', details: '', photos: [] })
+    setExpandedTaskId(taskId)
+    setNotice('Task added.')
+  }
+
+  function deleteTask(taskId) {
+    updateActiveBuild((build) => ({
+      ...build,
+      tasks: (build.tasks || []).filter((t) => t.id !== taskId),
+      updatedAt: new Date().toISOString(),
+    }))
+    if (expandedTaskId === taskId) setExpandedTaskId(null)
+    setNotice('Task deleted.')
+  }
+
+  function cycleTaskStatus(taskId) {
+    updateActiveBuild((build) => ({
+      ...build,
+      tasks: (build.tasks || []).map((t) => {
+        if (t.id !== taskId) return t
+        const index = taskStatuses.indexOf(t.status)
+        return { ...t, status: taskStatuses[(index + 1) % taskStatuses.length] }
+      }),
+      updatedAt: new Date().toISOString(),
+    }))
+  }
+
+  function commitTaskNotes(taskId) {
+    const draft = taskNoteDrafts[taskId]
+    if (draft === undefined) return
+    updateActiveBuild((build) => ({
+      ...build,
+      tasks: (build.tasks || []).map((t) => t.id === taskId ? { ...t, notes: draft } : t),
+      updatedAt: new Date().toISOString(),
+    }))
+  }
+
+  async function handleTaskPhotos(event) {
+    const files = Array.from(event.target.files || [])
+    const photos = await Promise.all(files.map(async (file) => ({
+      id: makeId('photo'),
+      name: file.name,
+      dataUrl: await getFileDataUrl(file),
+    })))
+    setNewTask((current) => ({ ...current, photos }))
+  }
+
+  async function addTaskPhoto(taskId, event) {
+    const files = Array.from(event.target.files || [])
+    if (!files.length) return
+    const newPhotos = await Promise.all(files.map(async (file) => ({
+      id: makeId('photo'),
+      name: file.name,
+      dataUrl: await getFileDataUrl(file),
+    })))
+    updateActiveBuild((build) => ({
+      ...build,
+      tasks: (build.tasks || []).map((t) =>
+        t.id === taskId ? { ...t, photos: [...(t.photos || []), ...newPhotos] } : t,
+      ),
+      updatedAt: new Date().toISOString(),
+    }))
   }
 
   function addPin(event) {
@@ -1726,6 +1816,60 @@ function App() {
 
         {activeTab === 'dashboard' && (
           <section className="page-section">
+
+            {/* ── Task board ── primary hero section */}
+            <article className="card">
+              <div className="card-toolbar">
+                <div className="card-title">Task board</div>
+                {isShop && (
+                  <button className="button small subtle" onClick={() => startTransition(() => setActiveTab('tasks'))}>
+                    + Add task
+                  </button>
+                )}
+              </div>
+              {(activeBuild.tasks || []).filter((t) => t.status !== 'done').length === 0 ? (
+                <p className="empty-note">No open tasks. {isShop ? 'Go to the Tasks tab to add one.' : ''}</p>
+              ) : (
+                <div className="dashboard-task-board">
+                  {/* In progress column */}
+                  <div className="dashboard-task-col">
+                    <div className="dashboard-task-col-label">In progress</div>
+                    {(activeBuild.tasks || []).filter((t) => t.status === 'in_progress').length === 0
+                      ? <p className="empty-note" style={{ fontSize: '0.82rem' }}>None</p>
+                      : (activeBuild.tasks || []).filter((t) => t.status === 'in_progress').map((task) => {
+                          const linkedPart = activeBuild.parts.find((p) => p.id === task.partId)
+                          return (
+                            <div key={task.id} className="dashboard-task-chip task-status-in_progress" onClick={() => { startTransition(() => setActiveTab('tasks')); setExpandedTaskId(task.id) }}>
+                              <strong>{task.title}</strong>
+                              {linkedPart && <span>🔗 {linkedPart.name}</span>}
+                              {task.deadline && <span>📅 {formatDate(task.deadline)}</span>}
+                              {task.notes && <span className="dashboard-task-note">{task.notes}</span>}
+                            </div>
+                          )
+                        })
+                    }
+                  </div>
+                  {/* Open column */}
+                  <div className="dashboard-task-col">
+                    <div className="dashboard-task-col-label">Open</div>
+                    {(activeBuild.tasks || []).filter((t) => t.status === 'open').length === 0
+                      ? <p className="empty-note" style={{ fontSize: '0.82rem' }}>None</p>
+                      : (activeBuild.tasks || []).filter((t) => t.status === 'open').map((task) => {
+                          const linkedPart = activeBuild.parts.find((p) => p.id === task.partId)
+                          return (
+                            <div key={task.id} className="dashboard-task-chip task-status-open" onClick={() => { startTransition(() => setActiveTab('tasks')); setExpandedTaskId(task.id) }}>
+                              <strong>{task.title}</strong>
+                              {linkedPart && <span>🔗 {linkedPart.name}</span>}
+                              {task.deadline && <span>📅 {formatDate(task.deadline)}</span>}
+                            </div>
+                          )
+                        })
+                    }
+                  </div>
+                </div>
+              )}
+            </article>
+
             <div className="section-grid two">
               <article className="card">
                 <div className="card-title">Current build summary</div>
@@ -1828,6 +1972,125 @@ function App() {
                 </select>
                 <button className="button primary" type="submit">Create build</button>
               </form>
+            </article>
+          </section>
+        )}
+
+        {activeTab === 'tasks' && (
+          <section className="page-section">
+            {isShop ? (
+              <article className="card">
+                <div className="card-title">Add task</div>
+                <form className="form-grid three" onSubmit={addTask}>
+                  <input
+                    onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                    placeholder="Task title"
+                    value={newTask.title}
+                  />
+                  <select
+                    onChange={(e) => setNewTask({ ...newTask, partId: e.target.value })}
+                    value={newTask.partId}
+                  >
+                    <option value="">Not linked to a part</option>
+                    {activeBuild.parts.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  <input
+                    type="date"
+                    onChange={(e) => setNewTask({ ...newTask, deadline: e.target.value })}
+                    value={newTask.deadline}
+                  />
+                  <textarea
+                    className="span-two"
+                    onChange={(e) => setNewTask({ ...newTask, details: e.target.value })}
+                    placeholder="Task details"
+                    rows="3"
+                    value={newTask.details}
+                  />
+                  <div className="photo-upload-field">
+                    <span className="field-label">Photos (optional)</span>
+                    <input accept="image/*" multiple onChange={handleTaskPhotos} type="file" />
+                  </div>
+                  <button className="button primary" type="submit">Add task</button>
+                </form>
+                {newTask.photos.length > 0 && <PhotoStrip photos={newTask.photos} />}
+              </article>
+            ) : null}
+
+            <article className="card">
+              <div className="card-title">Tasks</div>
+              {(activeBuild.tasks || []).length === 0 ? (
+                <p className="empty-note">No tasks yet. Add one above to get started.</p>
+              ) : (
+                <div className="task-list">
+                  {[...( activeBuild.tasks || [])].sort((a, b) => {
+                    const order = { in_progress: 0, open: 1, done: 2 }
+                    return (order[a.status] ?? 1) - (order[b.status] ?? 1)
+                  }).map((task) => {
+                    const linkedPart = activeBuild.parts.find((p) => p.id === task.partId)
+                    const isExpanded = expandedTaskId === task.id
+                    const noteDraft = taskNoteDrafts[task.id] ?? task.notes ?? ''
+                    return (
+                      <div key={task.id} className={`task-card task-status-${task.status}`}>
+                        <div
+                          className="task-card-header"
+                          onClick={() => setExpandedTaskId(isExpanded ? null : task.id)}
+                        >
+                          <div className="task-card-title">
+                            <strong>{task.title}</strong>
+                            <div className="task-card-meta">
+                              {linkedPart && <span>🔗 {linkedPart.name}</span>}
+                              {task.deadline && <span>📅 {formatDate(task.deadline)}</span>}
+                            </div>
+                          </div>
+                          <span className={`pill ${statusClass(task.status)}`}>
+                            {task.status.replace('_', ' ')}
+                          </span>
+                          <span className="task-expand-icon">{isExpanded ? '▲' : '▼'}</span>
+                        </div>
+                        {isExpanded && (
+                          <div className="task-card-body">
+                            {task.details && (
+                              <div className="task-details-block">
+                                <span className="field-label">Details</span>
+                                <p>{task.details}</p>
+                              </div>
+                            )}
+                            <div>
+                              <span className="field-label">In-progress notes</span>
+                              <textarea
+                                rows="3"
+                                placeholder="Add notes as you work…"
+                                value={noteDraft}
+                                onChange={(e) => setTaskNoteDrafts((d) => ({ ...d, [task.id]: e.target.value }))}
+                                onBlur={() => commitTaskNotes(task.id)}
+                              />
+                            </div>
+                            {(task.photos || []).length > 0 && <PhotoStrip photos={task.photos} />}
+                            {isShop && (
+                              <div className="photo-upload-field inline-file-button">
+                                <label className="button small subtle">
+                                  Add photos
+                                  <input accept="image/*" multiple onChange={(e) => addTaskPhoto(task.id, e)} type="file" style={{ display: 'none' }} />
+                                </label>
+                              </div>
+                            )}
+                            {isShop && (
+                              <div className="row-actions">
+                                <button className="button small subtle" onClick={() => cycleTaskStatus(task.id)}>
+                                  {task.status === 'open' ? 'Start' : task.status === 'in_progress' ? 'Mark done' : 'Reopen'}
+                                </button>
+                                <button className="button small subtle delete-button" onClick={() => deleteTask(task.id)}>Delete</button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </article>
           </section>
         )}

@@ -178,6 +178,7 @@ export async function loadWorkspace(userId) {
             journal: [],
           },
           journal: row.data?.journal?.map((entry) => ({ photos: [], ...entry })) ?? [],
+          tasks: row.data?.tasks?.map((t) => ({ photos: [], notes: '', ...t })) ?? [],
         })),
       }
     }
@@ -348,6 +349,7 @@ export async function saveBuild(build, userId) {
         journal: [],
       },
       journal: build.journal,
+      tasks: build.tasks || [],
     },
   })
   if (error) console.error('[pitboard] saveBuild error:', error.message, error.code)
