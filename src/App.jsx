@@ -31,17 +31,50 @@ const roles = ['shop', 'customer']
 const tiers = ['free', 'garage', 'shop']
 const vehicleTypes = ['Car', 'Truck', 'Motorcycle', 'UTV', 'Boat']
 const years = Array.from({ length: 48 }, (_, index) => String(new Date().getFullYear() + 1 - index))
-const makes = ['Nissan', 'Ford', 'Chevrolet', 'Toyota', 'Honda', 'Dodge', 'Jeep', 'BMW', 'Mercedes-Benz', 'Other']
+const makesByVehicleType = {
+  Car: ['Nissan', 'Ford', 'Chevrolet', 'Toyota', 'Honda', 'Dodge', 'Jeep', 'BMW', 'Mercedes-Benz', 'Subaru', 'Mazda', 'Mitsubishi', 'Other'],
+  Truck: ['Nissan', 'Ford', 'Chevrolet', 'Toyota', 'Honda', 'Dodge', 'Ram', 'GMC', 'Other'],
+  Motorcycle: ['Yamaha', 'Honda', 'Kawasaki', 'Suzuki', 'Ducati', 'Harley-Davidson', 'BMW', 'KTM', 'Royal Enfield', 'Triumph', 'Other'],
+  UTV: ['Polaris', 'Can-Am', 'Yamaha', 'Honda', 'Kawasaki', 'Arctic Cat', 'Textron', 'Other'],
+  Boat: ['Yamaha', 'Mercury', 'MerCruiser', 'Volvo Penta', 'Evinrude', 'Boston Whaler', 'Sea Ray', 'Other'],
+}
 const modelsByMake = {
-  Nissan: ['D21 Pickup', '240SX', '300ZX', '350Z', '370Z', 'Frontier', 'Pathfinder', 'Other'],
-  Ford: ['Mustang', 'F-150', 'Ranger', 'Focus', 'Bronco', 'Other'],
-  Chevrolet: ['C10', 'Silverado', 'Camaro', 'Corvette', 'S10', 'Other'],
-  Toyota: ['Tacoma', 'Hilux', 'Supra', '4Runner', 'Corolla', 'Other'],
-  Honda: ['Civic', 'Accord', 'S2000', 'CR-V', 'Other'],
-  Dodge: ['Ram', 'Charger', 'Challenger', 'Dakota', 'Other'],
-  Jeep: ['Cherokee', 'Grand Cherokee', 'Wrangler', 'Comanche', 'Other'],
-  BMW: ['E30', 'E36', 'E46', 'E90', 'Other'],
+  // Cars / Trucks
+  Nissan: ['D21 Pickup', '240SX', '300ZX', '350Z', '370Z', 'Frontier', 'Pathfinder', 'Hardbody', 'Other'],
+  Ford: ['Mustang', 'F-150', 'F-250', 'Ranger', 'Bronco', 'Focus', 'Fusion', 'Other'],
+  Chevrolet: ['C10', 'C/K 1500', 'Silverado', 'Camaro', 'Corvette', 'S10', 'Blazer', 'Other'],
+  Toyota: ['Tacoma', 'Hilux', 'Tundra', 'Supra', '4Runner', 'Corolla', 'Celica', 'Other'],
+  Honda: ['Civic', 'Accord', 'S2000', 'CR-V', 'Ridgeline', 'CBR600RR', 'CBR1000RR', 'CB750', 'CB500F', 'CRF450', 'Other'],
+  Dodge: ['Ram 1500', 'Ram 2500', 'Charger', 'Challenger', 'Dakota', 'Viper', 'Other'],
+  Jeep: ['Cherokee', 'Grand Cherokee', 'Wrangler', 'Comanche', 'Gladiator', 'Other'],
+  BMW: ['E30', 'E36', 'E46', 'E90', 'M3', 'M5', 'S1000RR', 'R1250GS', 'F800GS', 'Other'],
   'Mercedes-Benz': ['190E', 'C-Class', 'E-Class', 'SL', 'Other'],
+  Subaru: ['Impreza', 'WRX', 'WRX STI', 'BRZ', 'Forester', 'Legacy', 'Other'],
+  Mazda: ['MX-5 Miata', 'RX-7', 'RX-8', 'Mazdaspeed3', 'Other'],
+  Mitsubishi: ['Lancer Evo', 'Eclipse', '3000GT', 'Galant VR-4', 'Other'],
+  Ram: ['1500', '2500', '3500', 'Other'],
+  GMC: ['Sierra 1500', 'Sierra 2500', 'Canyon', 'Jimmy', 'Other'],
+  // Motorcycles
+  Yamaha: ['YZF-R1', 'YZF-R6', 'MT-07', 'MT-09', 'FZ1', 'FZ-09', 'V-Star 650', 'YZ450F', 'WR450F', 'Other'],
+  Kawasaki: ['ZX-6R', 'ZX-10R', 'Ninja 400', 'Ninja 650', 'Z900', 'Z650', 'Vulcan 900', 'KX450', 'Other'],
+  Suzuki: ['GSX-R600', 'GSX-R750', 'GSX-R1000', 'SV650', 'DR-Z400', 'Hayabusa', 'Other'],
+  Ducati: ['Monster 821', 'Monster 1200', 'Panigale V4', '916', '998', 'Streetfighter V4', 'Other'],
+  'Harley-Davidson': ['Sportster 883', 'Sportster 1200', 'Dyna Street Bob', 'Softail', 'Road King', 'Street Glide', 'Other'],
+  KTM: ['390 Duke', '690 Duke', '1290 Super Duke R', 'RC 390', '450 EXC-F', '500 EXC-F', 'Other'],
+  'Royal Enfield': ['Bullet 500', 'Continental GT 650', 'Interceptor 650', 'Himalayan', 'Meteor 350', 'Other'],
+  Triumph: ['Bonneville T120', 'Street Triple R', 'Tiger 900', 'Speed Triple 1200', 'Thruxton', 'Other'],
+  // UTVs
+  Polaris: ['RZR XP 1000', 'RZR Pro XP', 'RZR XP Turbo', 'Ranger 1000', 'General 1000', 'Other'],
+  'Can-Am': ['Maverick X3', 'Maverick Sport', 'Defender HD10', 'Commander XT', 'Other'],
+  'Arctic Cat': ['Wildcat XX', 'Alterra 700', 'Alterra 1000', 'Other'],
+  Textron: ['Havoc X', 'Stampede 900', 'Wildcat XX', 'Other'],
+  // Boats
+  Mercury: ['60hp', '115hp', '150hp', '200hp', '250hp', '300hp', 'Other'],
+  MerCruiser: ['4.3L V6', '5.0L V8', '6.2L V8', 'Other'],
+  'Volvo Penta': ['D3', 'D4', 'D6', 'IPS Drive', 'Other'],
+  Evinrude: ['90hp E-TEC', '115hp E-TEC', '150hp E-TEC', '200hp E-TEC', 'Other'],
+  'Boston Whaler': ['130 Super Sport', '170 Montauk', '210 Montauk', '270 Dauntless', 'Other'],
+  'Sea Ray': ['SPX 190', 'SPX 210', 'SLX 280', 'Sundancer 350', 'Other'],
   Other: ['Custom', 'Other'],
 }
 const partCategoriesByVehicleType = {
@@ -133,8 +166,12 @@ function getVehicleLabel(build) {
   return build.vehicle || 'Year Make Model'
 }
 
+function getMakeOptions(vehicleType) {
+  return makesByVehicleType[vehicleType] || makesByVehicleType.Car
+}
+
 function getModelOptions(make) {
-  return modelsByMake[make] || modelsByMake.Other
+  return modelsByMake[make] || ['Custom', 'Other']
 }
 
 function getPartCategoryOptions(vehicleType) {
@@ -663,7 +700,7 @@ function App() {
   const [pinQuery, setPinQuery] = useState('')
   const [newLog, setNewLog] = useState('')
   const [journalDraftPhotos, setJournalDraftPhotos] = useState([])
-  const [newBuild, setNewBuild] = useState({ name: '', vehicleType: 'Truck', vehicleYear: '', vehicleMake: 'Nissan', vehicleModel: 'D21 Pickup', status: 'Planning' })
+  const [newBuild, setNewBuild] = useState({ name: '', vehicleType: 'Truck', vehicleYear: '', vehicleMake: getMakeOptions('Truck')[0], vehicleModel: getModelOptions(getMakeOptions('Truck')[0])[0], status: 'Planning' })
   const [newPart, setNewPart] = useState({ name: '', category: 'Engine', qty: 1, unitCost: '', status: 'planned', source: 'Aftermarket', vendor: '', supplier: '', notes: '', photos: [] })
   const [newPin, setNewPin] = useState({ pin: '', function: '', type: 'Analog 0-5V', wireGauge: '', wireColor: '' })
   const [newTune, setNewTune] = useState({ version: '', name: '', status: 'Testing', power: '', torque: '', boost: '', ecuPlatform: 'Speeduino', tuneType: 'Base Map' })
@@ -1053,7 +1090,7 @@ function App() {
       setActiveBuildId(build.id)
       setActiveTab('dashboard')
     })
-    setNewBuild({ name: '', vehicleType: 'Truck', vehicleYear: '', vehicleMake: 'Nissan', vehicleModel: 'D21 Pickup', status: 'Planning' })
+    setNewBuild({ name: '', vehicleType: 'Truck', vehicleYear: '', vehicleMake: getMakeOptions('Truck')[0], vehicleModel: getModelOptions(getMakeOptions('Truck')[0])[0], status: 'Planning' })
     setNotice('Build created.')
   }
 
@@ -1954,15 +1991,26 @@ function App() {
               <div className="card-title">Add build</div>
               <form className="form-grid three" onSubmit={addBuild}>
                 <input onChange={(event) => setNewBuild({ ...newBuild, name: event.target.value })} placeholder="Build name" value={newBuild.name} />
-                <select onChange={(event) => setNewBuild({ ...newBuild, vehicleType: event.target.value, vehicleMake: event.target.value === 'Motorcycle' ? 'Other' : newBuild.vehicleMake, vehicleModel: event.target.value === 'Motorcycle' ? 'Other' : newBuild.vehicleModel })} value={newBuild.vehicleType}>
+                <select
+                  onChange={(event) => {
+                    const vt = event.target.value
+                    const firstMake = getMakeOptions(vt)[0]
+                    const firstModel = getModelOptions(firstMake)[0]
+                    setNewBuild({ ...newBuild, vehicleType: vt, vehicleMake: firstMake, vehicleModel: firstModel })
+                  }}
+                  value={newBuild.vehicleType}
+                >
                   {vehicleTypes.map((vehicleType) => <option key={vehicleType} value={vehicleType}>{vehicleType}</option>)}
                 </select>
                 <select onChange={(event) => setNewBuild({ ...newBuild, vehicleYear: event.target.value })} value={newBuild.vehicleYear}>
                   <option value="">Year</option>
                   {years.map((year) => <option key={year} value={year}>{year}</option>)}
                 </select>
-                <select onChange={(event) => setNewBuild({ ...newBuild, vehicleMake: event.target.value, vehicleModel: getModelOptions(event.target.value)[0] })} value={newBuild.vehicleMake}>
-                  {makes.map((make) => <option key={make} value={make}>{make}</option>)}
+                <select
+                  onChange={(event) => setNewBuild({ ...newBuild, vehicleMake: event.target.value, vehicleModel: getModelOptions(event.target.value)[0] })}
+                  value={newBuild.vehicleMake}
+                >
+                  {getMakeOptions(newBuild.vehicleType).map((make) => <option key={make} value={make}>{make}</option>)}
                 </select>
                 <select onChange={(event) => setNewBuild({ ...newBuild, vehicleModel: event.target.value })} value={newBuild.vehicleModel}>
                   {getModelOptions(newBuild.vehicleMake).map((model) => <option key={model} value={model}>{model}</option>)}
@@ -2598,10 +2646,10 @@ function App() {
                 <div className="card-title">Active build details</div>
                 <div className="form-grid two">
                   <label><span className="field-label">Build name</span><input onChange={(event) => updateBuildField('name', event.target.value)} value={activeBuild.name} /></label>
-                  <label><span className="field-label">Vehicle type</span><select onChange={(event) => updateBuildField('vehicleType', event.target.value)} value={activeBuild.vehicleType || 'Truck'}>{vehicleTypes.map((vehicleType) => <option key={vehicleType} value={vehicleType}>{vehicleType}</option>)}</select></label>
+                  <label><span className="field-label">Vehicle type</span><select onChange={(event) => updateActiveBuild((build) => { const vehicleType = event.target.value; const vehicleMake = getMakeOptions(vehicleType)[0]; const vehicleModel = getModelOptions(vehicleMake)[0]; const next = { ...build, vehicleType, vehicleMake, vehicleModel, updatedAt: new Date().toISOString() }; next.vehicle = getVehicleLabel(next); return next })} value={activeBuild.vehicleType || 'Truck'}>{vehicleTypes.map((vehicleType) => <option key={vehicleType} value={vehicleType}>{vehicleType}</option>)}</select></label>
                   <label><span className="field-label">Vehicle year</span><select onChange={(event) => updateBuildVehicleField('vehicleYear', event.target.value)} value={activeBuild.vehicleYear || ''}><option value="">Year</option>{years.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
-                  <label><span className="field-label">Vehicle make</span><select onChange={(event) => updateActiveBuild((build) => { const vehicleMake = event.target.value; const vehicleModel = getModelOptions(vehicleMake)[0]; const next = { ...build, vehicleMake, vehicleModel, updatedAt: new Date().toISOString() }; next.vehicle = getVehicleLabel(next); return next })} value={activeBuild.vehicleMake || 'Nissan'}>{makes.map((make) => <option key={make} value={make}>{make}</option>)}</select></label>
-                  <label><span className="field-label">Vehicle model</span><select onChange={(event) => updateBuildVehicleField('vehicleModel', event.target.value)} value={activeBuild.vehicleModel || getModelOptions(activeBuild.vehicleMake || 'Nissan')[0]}>{getModelOptions(activeBuild.vehicleMake || 'Nissan').map((model) => <option key={model} value={model}>{model}</option>)}</select></label>
+                  <label><span className="field-label">Vehicle make</span><select onChange={(event) => updateActiveBuild((build) => { const vehicleMake = event.target.value; const vehicleModel = getModelOptions(vehicleMake)[0]; const next = { ...build, vehicleMake, vehicleModel, updatedAt: new Date().toISOString() }; next.vehicle = getVehicleLabel(next); return next })} value={activeBuild.vehicleMake || getMakeOptions(activeBuild.vehicleType || 'Truck')[0]}>{getMakeOptions(activeBuild.vehicleType || 'Truck').map((make) => <option key={make} value={make}>{make}</option>)}</select></label>
+                  <label><span className="field-label">Vehicle model</span><select onChange={(event) => updateBuildVehicleField('vehicleModel', event.target.value)} value={activeBuild.vehicleModel || getModelOptions(activeBuild.vehicleMake || getMakeOptions(activeBuild.vehicleType || 'Truck')[0])[0]}>{getModelOptions(activeBuild.vehicleMake || getMakeOptions(activeBuild.vehicleType || 'Truck')[0]).map((model) => <option key={model} value={model}>{model}</option>)}</select></label>
                   <label><span className="field-label">Build status</span><select onChange={(event) => updateBuildField('status', event.target.value)} value={activeBuild.status}>{buildStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
                   <label><span className="field-label">Budget target</span><input onChange={(event) => updateBuildBudget(event.target.value)} type="number" value={activeBuild.budget.target} /></label>
                   <label><span className="field-label">Client name</span><input onChange={(event) => updateClientField('name', event.target.value)} value={activeBuild.client.name} /></label>

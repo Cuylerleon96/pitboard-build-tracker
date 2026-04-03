@@ -38,7 +38,6 @@ export const demoWorkspace = {
       pins: [],
       tunes: [],
       labor: [],
-      tasks: [],
       shopSnapshot: {
         name: 'BuildPortal',
         subtitle: 'Customer-facing build tracking for shops and custom projects',
