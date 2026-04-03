@@ -35,6 +35,7 @@ export const demoWorkspace = {
         { id: 'phase-testing', name: 'Testing / tune', owner: '', done: false, blockedOn: '' },
       ],
       parts: [],
+      connectors: [],
       pins: [],
       tunes: [],
       labor: [],

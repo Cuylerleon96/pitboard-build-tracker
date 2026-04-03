@@ -702,7 +702,9 @@ function App() {
   const [journalDraftPhotos, setJournalDraftPhotos] = useState([])
   const [newBuild, setNewBuild] = useState({ name: '', vehicleType: 'Truck', vehicleYear: '', vehicleMake: getMakeOptions('Truck')[0], vehicleModel: getModelOptions(getMakeOptions('Truck')[0])[0], status: 'Planning' })
   const [newPart, setNewPart] = useState({ name: '', category: 'Engine', qty: 1, unitCost: '', status: 'planned', source: 'Aftermarket', vendor: '', supplier: '', notes: '', photos: [] })
-  const [newPin, setNewPin] = useState({ pin: '', function: '', type: 'Analog 0-5V', wireGauge: '', wireColor: '' })
+  const [newPin, setNewPin] = useState({ pin: '', function: '', type: 'Analog 0-5V', wireGauge: '', wireColor: '', connectorId: '' })
+  const [newConnector, setNewConnector] = useState({ name: '', description: '' })
+  const [collapsedConnectors, setCollapsedConnectors] = useState({})
   const [newTune, setNewTune] = useState({ version: '', name: '', status: 'Testing', power: '', torque: '', boost: '', ecuPlatform: 'Speeduino', tuneType: 'Base Map' })
   const [newLabor, setNewLabor] = useState({ date: new Date().toISOString().slice(0, 10), task: '', hours: '', rate: '' })
   const [selectedTuneId, setSelectedTuneId] = useState(null)
@@ -1269,6 +1271,7 @@ function App() {
           type: newPin.type,
           wireGauge: newPin.wireGauge.trim(),
           wireColor: newPin.wireColor.trim(),
+          connectorId: newPin.connectorId || null,
           verified: false,
         },
         ...build.pins,
@@ -1276,7 +1279,7 @@ function App() {
       updatedAt: new Date().toISOString(),
     }))
 
-    setNewPin({ pin: '', function: '', type: 'Analog 0-5V', wireGauge: '', wireColor: '' })
+    setNewPin({ pin: '', function: '', type: 'Analog 0-5V', wireGauge: '', wireColor: '', connectorId: newPin.connectorId })
     setNotice('Pin added.')
   }
 
@@ -1287,6 +1290,40 @@ function App() {
       updatedAt: new Date().toISOString(),
     }))
     setNotice('Pin deleted.')
+  }
+
+  function addConnector(event) {
+    event.preventDefault()
+    if (!newConnector.name.trim()) return
+    updateActiveBuild((build) => ({
+      ...build,
+      connectors: [
+        ...(build.connectors || []),
+        { id: makeId('connector'), name: newConnector.name.trim(), description: newConnector.description.trim() },
+      ],
+      updatedAt: new Date().toISOString(),
+    }))
+    setNewConnector({ name: '', description: '' })
+    setNotice('Connector added.')
+  }
+
+  function deleteConnector(connectorId) {
+    updateActiveBuild((build) => ({
+      ...build,
+      connectors: (build.connectors || []).filter((c) => c.id !== connectorId),
+      // unassign any pins that belonged to this connector
+      pins: build.pins.map((pin) => pin.connectorId === connectorId ? { ...pin, connectorId: null } : pin),
+      updatedAt: new Date().toISOString(),
+    }))
+    setNotice('Connector removed.')
+  }
+
+  function movePinConnector(pinId, connectorId) {
+    updateActiveBuild((build) => ({
+      ...build,
+      pins: build.pins.map((pin) => pin.id === pinId ? { ...pin, connectorId: connectorId || null } : pin),
+      updatedAt: new Date().toISOString(),
+    }))
   }
 
   function addTune(event) {
@@ -2272,21 +2309,57 @@ function App() {
         {activeTab === 'wiring' && (
           <section className="page-section">
             {isShop ? (
-              <article className="card">
-                <div className="card-title">Add pin / signal</div>
-                <form className="form-grid six" onSubmit={addPin}>
-                  <input onChange={(event) => setNewPin({ ...newPin, pin: event.target.value })} placeholder="Pin label" value={newPin.pin} />
-                  <input onChange={(event) => setNewPin({ ...newPin, function: event.target.value })} placeholder="Function" value={newPin.function} />
-                  <select onChange={(event) => setNewPin({ ...newPin, type: event.target.value })} value={newPin.type}>
-                    {pinTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-                  </select>
-                  <input onChange={(event) => setNewPin({ ...newPin, wireGauge: event.target.value })} placeholder="Wire gauge (18AWG)" value={newPin.wireGauge} />
-                  <input onChange={(event) => setNewPin({ ...newPin, wireColor: event.target.value })} placeholder="Wire color" value={newPin.wireColor} />
-                  <button className="button primary" type="submit">Add pin</button>
-                </form>
-              </article>
+              <>
+                {/* ── Add connector ── */}
+                <article className="card">
+                  <div className="card-title">Connectors</div>
+                  <form className="form-grid three" onSubmit={addConnector} style={{ marginBottom: (activeBuild.connectors || []).length ? '14px' : '0' }}>
+                    <input onChange={(e) => setNewConnector({ ...newConnector, name: e.target.value })} placeholder="Connector name (e.g. ECU C1, Injector Rail)" value={newConnector.name} />
+                    <input onChange={(e) => setNewConnector({ ...newConnector, description: e.target.value })} placeholder="Description / location (optional)" value={newConnector.description} />
+                    <button className="button primary" type="submit">Add connector</button>
+                  </form>
+                  {(activeBuild.connectors || []).length > 0 && (
+                    <div className="connector-chip-list">
+                      {(activeBuild.connectors || []).map((c) => (
+                        <div key={c.id} className="connector-chip">
+                          <span className="connector-chip-name">{c.name}</span>
+                          {c.description && <span className="connector-chip-desc">{c.description}</span>}
+                          <span className="connector-chip-count">
+                            {activeBuild.pins.filter((p) => p.connectorId === c.id).length} pins
+                          </span>
+                          <button className="button small subtle delete-button" onClick={() => deleteConnector(c.id)}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </article>
+
+                {/* ── Add pin ── */}
+                <article className="card">
+                  <div className="card-title">Add pin / signal</div>
+                  <form className="form-grid four" onSubmit={addPin}>
+                    {(activeBuild.connectors || []).length > 0 && (
+                      <select onChange={(e) => setNewPin({ ...newPin, connectorId: e.target.value })} value={newPin.connectorId}>
+                        <option value="">Ungrouped</option>
+                        {(activeBuild.connectors || []).map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    )}
+                    <input onChange={(e) => setNewPin({ ...newPin, pin: e.target.value })} placeholder="Pin label" value={newPin.pin} />
+                    <input onChange={(e) => setNewPin({ ...newPin, function: e.target.value })} placeholder="Function" value={newPin.function} />
+                    <select onChange={(e) => setNewPin({ ...newPin, type: e.target.value })} value={newPin.type}>
+                      {pinTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                    <input onChange={(e) => setNewPin({ ...newPin, wireGauge: e.target.value })} placeholder="Wire gauge (18AWG)" value={newPin.wireGauge} />
+                    <input onChange={(e) => setNewPin({ ...newPin, wireColor: e.target.value })} placeholder="Wire color" value={newPin.wireColor} />
+                    <button className="button primary" type="submit">Add pin</button>
+                  </form>
+                </article>
+              </>
             ) : null}
 
+            {/* ── Pin map ── */}
             <article className="card">
               <div className="card-toolbar">
                 <div className="card-title">Wiring / pin map</div>
@@ -2294,32 +2367,162 @@ function App() {
                   <input onChange={(event) => setPinQuery(event.target.value)} placeholder="Search pins" value={pinQuery} />
                 </div>
               </div>
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr><th>Pin</th><th>Function</th><th>Type</th><th>Wire gauge</th><th>Wire color</th><th>Verified</th><th /></tr>
-                  </thead>
-                  <tbody>
-                    {filteredPins.length === 0 ? (
-                      <tr><td className="empty-cell" colSpan="7">No wiring items added yet.</td></tr>
-                    ) : filteredPins.map((pin) => (
-                      <tr key={pin.id}>
-                        <td>{pin.pin}</td>
-                        <td>{pin.function || '-'}</td>
-                        <td>{pin.type || '-'}</td>
-                        <td>{pin.wireGauge || '-'}</td>
-                        <td>{pin.wireColor || '-'}</td>
-                        <td>
-                          <button className={`pill buttonless ${pin.verified ? 'good' : 'neutral'}`} disabled={!isShop} onClick={() => togglePin(pin.id)}>
-                            {pin.verified ? 'Verified' : 'Needs check'}
-                          </button>
-                        </td>
-                        <td>{isShop ? <button className="button small subtle delete-button" onClick={() => deletePin(pin.id)}>Delete</button> : '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+
+              {/* Flat search results */}
+              {pinQuery.trim() ? (
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th>Connector</th><th>Pin</th><th>Function</th><th>Type</th><th>Wire gauge</th><th>Wire color</th><th>Verified</th><th /></tr></thead>
+                    <tbody>
+                      {filteredPins.length === 0
+                        ? <tr><td className="empty-cell" colSpan="8">No pins match your search.</td></tr>
+                        : filteredPins.map((pin) => {
+                            const conn = (activeBuild.connectors || []).find((c) => c.id === pin.connectorId)
+                            return (
+                              <tr key={pin.id}>
+                                <td>{conn ? <span className="connector-tag">{conn.name}</span> : <span style={{ color: 'var(--text-soft)' }}>—</span>}</td>
+                                <td>{pin.pin}</td>
+                                <td>{pin.function || '-'}</td>
+                                <td>{pin.type || '-'}</td>
+                                <td>{pin.wireGauge || '-'}</td>
+                                <td>{pin.wireColor || '-'}</td>
+                                <td><button className={`pill buttonless ${pin.verified ? 'good' : 'neutral'}`} disabled={!isShop} onClick={() => togglePin(pin.id)}>{pin.verified ? 'Verified' : 'Needs check'}</button></td>
+                                <td>{isShop ? <button className="button small subtle delete-button" onClick={() => deletePin(pin.id)}>Delete</button> : '-'}</td>
+                              </tr>
+                            )
+                          })
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              ) : (activeBuild.pins.length === 0 ? (
+                <p className="empty-note">No pins yet. Add connectors first, then add pins to them.</p>
+              ) : (
+                <div className="connector-sections">
+                  {/* One section per connector */}
+                  {(activeBuild.connectors || []).map((connector) => {
+                    const connPins = activeBuild.pins.filter((p) => p.connectorId === connector.id)
+                    const verifiedCount = connPins.filter((p) => p.verified).length
+                    const isCollapsed = collapsedConnectors[connector.id]
+                    return (
+                      <div key={connector.id} className="connector-section">
+                        <div className="connector-section-header" onClick={() => setCollapsedConnectors((prev) => ({ ...prev, [connector.id]: !prev[connector.id] }))}>
+                          <div className="connector-section-title">
+                            <strong>{connector.name}</strong>
+                            {connector.description && <span className="connector-section-desc">{connector.description}</span>}
+                          </div>
+                          <div className="connector-section-meta">
+                            <span className="pill neutral">{connPins.length} pin{connPins.length !== 1 ? 's' : ''}</span>
+                            {connPins.length > 0 && <span className={`pill ${verifiedCount === connPins.length ? 'good' : 'neutral'}`}>{verifiedCount}/{connPins.length} verified</span>}
+                          </div>
+                          <span className="task-expand-icon">{isCollapsed ? '▼' : '▲'}</span>
+                        </div>
+                        {!isCollapsed && (
+                          <div className="table-wrap connector-table">
+                            <table>
+                              <thead><tr><th>Pin</th><th>Function</th><th>Type</th><th>Wire gauge</th><th>Wire color</th><th>Verified</th><th /></tr></thead>
+                              <tbody>
+                                {connPins.length === 0
+                                  ? <tr><td className="empty-cell" colSpan="7">No pins in this connector yet.</td></tr>
+                                  : connPins.map((pin) => (
+                                      <tr key={pin.id}>
+                                        <td>{pin.pin}</td>
+                                        <td>{pin.function || '-'}</td>
+                                        <td>{pin.type || '-'}</td>
+                                        <td>{pin.wireGauge || '-'}</td>
+                                        <td>{pin.wireColor || '-'}</td>
+                                        <td><button className={`pill buttonless ${pin.verified ? 'good' : 'neutral'}`} disabled={!isShop} onClick={() => togglePin(pin.id)}>{pin.verified ? 'Verified' : 'Needs check'}</button></td>
+                                        <td>
+                                          {isShop ? (
+                                            <div className="row-actions">
+                                              {(activeBuild.connectors || []).length > 1 && (
+                                                <select
+                                                  className="connector-move-select"
+                                                  value={pin.connectorId || ''}
+                                                  onChange={(e) => movePinConnector(pin.id, e.target.value)}
+                                                  onClick={(e) => e.stopPropagation()}
+                                                >
+                                                  <option value="">Ungrouped</option>
+                                                  {(activeBuild.connectors || []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                                </select>
+                                              )}
+                                              <button className="button small subtle delete-button" onClick={() => deletePin(pin.id)}>Delete</button>
+                                            </div>
+                                          ) : '-'}
+                                        </td>
+                                      </tr>
+                                    ))
+                                }
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+
+                  {/* Ungrouped pins */}
+                  {(() => {
+                    const ungrouped = activeBuild.pins.filter((p) => !p.connectorId)
+                    if (ungrouped.length === 0 && (activeBuild.connectors || []).length > 0) return null
+                    const isCollapsed = collapsedConnectors['__ungrouped__']
+                    return (
+                      <div className="connector-section">
+                        <div className="connector-section-header" onClick={() => setCollapsedConnectors((prev) => ({ ...prev, __ungrouped__: !prev.__ungrouped__ }))}>
+                          <div className="connector-section-title">
+                            <strong>Ungrouped</strong>
+                            <span className="connector-section-desc">Pins not assigned to a connector</span>
+                          </div>
+                          <div className="connector-section-meta">
+                            <span className="pill neutral">{ungrouped.length} pin{ungrouped.length !== 1 ? 's' : ''}</span>
+                          </div>
+                          <span className="task-expand-icon">{isCollapsed ? '▼' : '▲'}</span>
+                        </div>
+                        {!isCollapsed && (
+                          <div className="table-wrap connector-table">
+                            <table>
+                              <thead><tr><th>Pin</th><th>Function</th><th>Type</th><th>Wire gauge</th><th>Wire color</th><th>Verified</th><th /></tr></thead>
+                              <tbody>
+                                {ungrouped.length === 0
+                                  ? <tr><td className="empty-cell" colSpan="7">No ungrouped pins.</td></tr>
+                                  : ungrouped.map((pin) => (
+                                      <tr key={pin.id}>
+                                        <td>{pin.pin}</td>
+                                        <td>{pin.function || '-'}</td>
+                                        <td>{pin.type || '-'}</td>
+                                        <td>{pin.wireGauge || '-'}</td>
+                                        <td>{pin.wireColor || '-'}</td>
+                                        <td><button className={`pill buttonless ${pin.verified ? 'good' : 'neutral'}`} disabled={!isShop} onClick={() => togglePin(pin.id)}>{pin.verified ? 'Verified' : 'Needs check'}</button></td>
+                                        <td>
+                                          {isShop ? (
+                                            <div className="row-actions">
+                                              {(activeBuild.connectors || []).length > 0 && (
+                                                <select
+                                                  className="connector-move-select"
+                                                  value=""
+                                                  onChange={(e) => movePinConnector(pin.id, e.target.value)}
+                                                  onClick={(e) => e.stopPropagation()}
+                                                >
+                                                  <option value="">Move to…</option>
+                                                  {(activeBuild.connectors || []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                                </select>
+                                              )}
+                                              <button className="button small subtle delete-button" onClick={() => deletePin(pin.id)}>Delete</button>
+                                            </div>
+                                          ) : '-'}
+                                        </td>
+                                      </tr>
+                                    ))
+                                }
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+                </div>
+              ))}
             </article>
 
             {isShop ? (

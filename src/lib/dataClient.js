@@ -161,7 +161,8 @@ export async function loadWorkspace(userId) {
             photos: [],
             ...part,
           })) ?? [],
-          pins: row.data?.pins?.map((pin) => ({ wireGauge: '', wireColor: '', ...pin })) ?? [],
+          connectors: row.data?.connectors ?? [],
+          pins: row.data?.pins?.map((pin) => ({ wireGauge: '', wireColor: '', connectorId: null, ...pin })) ?? [],
           tunes: row.data?.tunes?.map((tune) => ({
             ecuPlatform: 'Other',
             tuneType: 'Other',
@@ -337,6 +338,7 @@ export async function saveBuild(build, userId) {
       vehicleModel: build.vehicleModel || '',
       phases: build.phases,
       parts: build.parts,
+      connectors: build.connectors || [],
       pins: build.pins,
       tunes: build.tunes,
       labor: build.labor || [],

@@ -752,3 +752,166 @@ label {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Connector / Wiring ─────────────────────────────────── */
+
+.connector-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.connector-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.85rem;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.connector-chip:hover {
+  border-color: rgba(249, 115, 22, 0.36);
+  background: rgba(249, 115, 22, 0.07);
+}
+
+.connector-chip-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.connector-chip-desc {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+
+.connector-chip-count {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--accent-strong);
+  background: rgba(249, 115, 22, 0.12);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.connector-chip-del {
+  background: none;
+  border: none;
+  color: var(--text-soft);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.connector-chip-del:hover {
+  color: #ff6b6b;
+}
+
+/* Connector sections in pin map */
+
+.connector-sections {
+  display: grid;
+  gap: 16px;
+}
+
+.connector-section {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.connector-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  user-select: none;
+  transition: background 120ms ease;
+}
+
+.connector-section-header:hover {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.connector-section-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.connector-section-desc {
+  color: var(--text-soft);
+  font-size: 0.8rem;
+}
+
+.connector-section-meta {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--accent-strong);
+}
+
+.connector-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.connector-table th,
+.connector-table td {
+  padding: 9px 12px;
+  text-align: left;
+  font-size: 0.82rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.connector-table th {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.connector-table tr:last-child td {
+  border-bottom: none;
+}
+
+.connector-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-soft);
+}
+
+.connector-tag.good {
+  background: rgba(82, 208, 141, 0.15);
+  color: var(--success);
+}
+
+.connector-tag.warn {
+  background: rgba(249, 115, 22, 0.15);
+  color: var(--accent-strong);
+}
+
+.connector-tag.bad {
+  background: rgba(255, 80, 80, 0.12);
+  color: #ff8080;
+}
+
+.connector-move-select {
+  font-size: 0.78rem;
+  padding: 4px 8px;
+  border-radius: 8px;
+  width: auto;
+}
