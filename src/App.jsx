@@ -654,6 +654,8 @@ function App() {
   const [role, setRole] = useState('shop')
   const [partsQuery, setPartsQuery] = useState('')
   const [partsFilter, setPartsFilter] = useState('all')
+  const [editingPartId, setEditingPartId] = useState(null)
+  const [editDraft, setEditDraft] = useState(null)
   const [pinQuery, setPinQuery] = useState('')
   const [newLog, setNewLog] = useState('')
   const [journalDraftPhotos, setJournalDraftPhotos] = useState([])
@@ -1087,6 +1089,43 @@ function App() {
       updatedAt: new Date().toISOString(),
     }))
     setNotice('Part deleted.')
+  }
+
+  function startEditPart(part) {
+    setEditingPartId(part.id)
+    setEditDraft({ ...part })
+  }
+
+  function cancelEditPart() {
+    setEditingPartId(null)
+    setEditDraft(null)
+  }
+
+  function saveEditPart() {
+    if (!editDraft) return
+    updateActiveBuild((build) => ({
+      ...build,
+      parts: build.parts.map((p) =>
+        p.id === editDraft.id
+          ? {
+              ...p,
+              name: editDraft.name.trim(),
+              notes: (editDraft.notes || '').trim(),
+              category: editDraft.category,
+              source: editDraft.source,
+              vendor: (editDraft.vendor || '').trim(),
+              supplier: (editDraft.supplier || '').trim(),
+              qty: Number(editDraft.qty) || 1,
+              unitCost: Number(editDraft.unitCost) || 0,
+              status: editDraft.status,
+            }
+          : p,
+      ),
+      updatedAt: new Date().toISOString(),
+    }))
+    setEditingPartId(null)
+    setEditDraft(null)
+    setNotice('Part updated.')
   }
 
   function addPin(event) {
@@ -1847,19 +1886,60 @@ function App() {
                   <tbody>
                     {filteredParts.length === 0 ? (
                       <tr><td className="empty-cell" colSpan="9">No parts added yet.</td></tr>
-                    ) : filteredParts.map((part) => (
-                      <tr key={part.id}>
-                        <td><strong>{part.name}</strong><span>{part.notes || 'No part notes'}</span><PhotoStrip photos={part.photos} /></td>
-                        <td>{part.category}</td>
-                        <td>{part.source || '-'}</td>
-                        <td>{[part.vendor, part.supplier].filter(Boolean).join(' / ') || '-'}</td>
-                        <td>{part.qty}</td>
-                        <td>{money.format(part.unitCost)}</td>
-                        <td>{money.format(part.qty * part.unitCost)}</td>
-                        <td><span className={`pill ${statusClass(part.status)}`}>{part.status}</span></td>
-                        <td>{isShop ? <div className="row-actions"><button className="button small subtle" onClick={() => cyclePartStatus(part.id)}>Next</button><button className="button small subtle delete-button" onClick={() => deletePart(part.id)}>Delete</button></div> : '-'}</td>
-                      </tr>
-                    ))}
+                    ) : filteredParts.map((part) => {
+                      const isEditing = isShop && editingPartId === part.id
+                      if (isEditing && editDraft) {
+                        return (
+                          <tr key={part.id} className="editing-row">
+                            <td>
+                              <input value={editDraft.name} onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} placeholder="Part name" />
+                              <textarea value={editDraft.notes} onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })} placeholder="Notes" rows="2" style={{ marginTop: '6px' }} />
+                            </td>
+                            <td>
+                              <select value={editDraft.category} onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })}>
+                                {partCategoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            </td>
+                            <td>
+                              <select value={editDraft.source} onChange={(e) => setEditDraft({ ...editDraft, source: e.target.value })}>
+                                {partSources.map((s) => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                            </td>
+                            <td>
+                              <input value={editDraft.vendor} onChange={(e) => setEditDraft({ ...editDraft, vendor: e.target.value })} placeholder="Vendor" />
+                              <input value={editDraft.supplier} onChange={(e) => setEditDraft({ ...editDraft, supplier: e.target.value })} placeholder="Supplier" style={{ marginTop: '6px' }} />
+                            </td>
+                            <td><input type="number" min="1" value={editDraft.qty} onChange={(e) => setEditDraft({ ...editDraft, qty: e.target.value })} style={{ minWidth: '60px' }} /></td>
+                            <td><input type="number" min="0" step="0.01" value={editDraft.unitCost} onChange={(e) => setEditDraft({ ...editDraft, unitCost: e.target.value })} style={{ minWidth: '80px' }} /></td>
+                            <td>{money.format(Number(editDraft.qty || 0) * Number(editDraft.unitCost || 0))}</td>
+                            <td>
+                              <select value={editDraft.status} onChange={(e) => setEditDraft({ ...editDraft, status: e.target.value })}>
+                                {partsStatuses.map((s) => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                            </td>
+                            <td>
+                              <div className="row-actions">
+                                <button className="button small primary" onClick={saveEditPart}>Save</button>
+                                <button className="button small ghost" onClick={cancelEditPart}>Cancel</button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      }
+                      return (
+                        <tr key={part.id}>
+                          <td><strong>{part.name}</strong><span>{part.notes || 'No part notes'}</span><PhotoStrip photos={part.photos} /></td>
+                          <td>{part.category}</td>
+                          <td>{part.source || '-'}</td>
+                          <td>{[part.vendor, part.supplier].filter(Boolean).join(' / ') || '-'}</td>
+                          <td>{part.qty}</td>
+                          <td>{money.format(part.unitCost)}</td>
+                          <td>{money.format(part.qty * part.unitCost)}</td>
+                          <td><span className={`pill ${statusClass(part.status)}`}>{part.status}</span></td>
+                          <td>{isShop ? <div className="row-actions"><button className="button small subtle" onClick={() => startEditPart(part)}>Edit</button><button className="button small subtle" onClick={() => cyclePartStatus(part.id)}>Next</button><button className="button small subtle delete-button" onClick={() => deletePart(part.id)}>Delete</button></div> : '-'}</td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

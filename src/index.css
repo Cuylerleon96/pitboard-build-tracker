@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;700&display=swap');
 
 :root {
+  color-scheme: dark;
   --bg: #06070a;
   --line: rgba(255, 255, 255, 0.08);
   --text: #f4f1ea;
@@ -80,6 +81,12 @@ textarea {
 
 textarea {
   resize: vertical;
+}
+
+/* Force native select popups to match the dark theme */
+select option {
+  background: #0f1117;
+  color: #f4f1ea;
 }
 
 ::placeholder {
