@@ -162,7 +162,24 @@ export async function loadWorkspace(userId) {
             ...part,
           })) ?? [],
           connectors: row.data?.connectors ?? [],
-          pins: row.data?.pins?.map((pin) => ({ wireGauge: '', wireColor: '', connectorId: null, ...pin })) ?? [],
+          pins: row.data?.pins?.map((pin) => {
+            // Migrate legacy single-endpoint pins (connectorId + pin) to two-endpoint model
+            if (pin.connectorId !== undefined || pin.pin !== undefined) {
+              return {
+                fromConnectorId: pin.connectorId ?? null,
+                fromPin: pin.pin ?? '',
+                toConnectorId: null,
+                toPin: '',
+                function: pin.function ?? '',
+                type: pin.type ?? 'Other',
+                wireGauge: pin.wireGauge ?? '',
+                wireColor: pin.wireColor ?? '',
+                verified: pin.verified ?? false,
+                id: pin.id,
+              }
+            }
+            return { fromConnectorId: null, fromPin: '', toConnectorId: null, toPin: '', wireGauge: '', wireColor: '', ...pin }
+          }) ?? [],
           tunes: row.data?.tunes?.map((tune) => ({
             ecuPlatform: 'Other',
             tuneType: 'Other',
