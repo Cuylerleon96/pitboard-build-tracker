@@ -344,6 +344,70 @@ function TechnicianNotes({ entries, draft, onChange, onSubmit, onDelete, title }
   )
 }
 
+/* ── Custom Select — replaces native <AppSelect> so the popup is always dark ── */
+function AppSelect({ value, onChange, disabled, className, style, onClick, children }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  // Parse <option> children into {value, label, disabled} objects
+  const options = []
+  ;(Array.isArray(children) ? children.flat() : [children]).forEach((child) => {
+    if (!child || child.type !== 'option') return
+    options.push({
+      value: child.props.value !== undefined ? child.props.value : child.props.children,
+      label: child.props.children,
+      disabled: child.props.disabled || false,
+    })
+  })
+
+  const selectedLabel = options.find((o) => String(o.value) === String(value ?? ''))?.label ?? value ?? ''
+
+  useEffect(() => {
+    if (!open) return
+    function handle(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [open])
+
+  function handleTrigger(e) {
+    if (onClick) onClick(e)
+    if (!disabled) setOpen((v) => !v)
+  }
+
+  function handlePick(opt, e) {
+    e.stopPropagation()
+    if (opt.disabled) return
+    onChange({ target: { value: opt.value } })
+    setOpen(false)
+  }
+
+  return (
+    <div
+      ref={ref}
+      className={`app-select${disabled ? ' app-select--disabled' : ''}${open ? ' app-select--open' : ''}${className ? ' ' + className : ''}`}
+      style={style}
+    >
+      <div className="app-select-trigger" onMouseDown={handleTrigger}>
+        <span className="app-select-value">{selectedLabel}</span>
+        <span className="app-select-arrow">{open ? '▴' : '▾'}</span>
+      </div>
+      {open && (
+        <div className="app-select-menu">
+          {options.map((opt, i) => (
+            <div
+              key={i}
+              className={`app-select-option${String(opt.value) === String(value ?? '') ? ' app-select-option--selected' : ''}${opt.disabled ? ' app-select-option--disabled' : ''}`}
+              onMouseDown={(e) => handlePick(opt, e)}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Wiring diagram colour helper ───────────────────────── */
 function wireColorToHex(name) {
   if (!name) return 'rgba(249,115,22,0.65)'
@@ -591,9 +655,9 @@ function AuthScreen({
             <>
               <label>
                 <span className="field-label">Account type</span>
-                <select disabled={hasShopAdmin} onChange={(event) => onAuthFormChange('role', event.target.value)} value={hasShopAdmin ? 'customer' : authForm.role}>
+                <AppSelectdisabled={hasShopAdmin} onChange={(event) => onAuthFormChange('role', event.target.value)} value={hasShopAdmin ? 'customer' : authForm.role}>
                   {roles.map((roleOption) => <option key={roleOption} value={roleOption}>{roleOption}</option>)}
-                </select>
+                </AppSelect>
               </label>
               {hasShopAdmin ? (
                 <div className="info-line">
@@ -653,9 +717,9 @@ function ProfileSetupScreen({ authBusy, authForm, hasShopAdmin, onChange, onSubm
         <form className="stack-form auth-form" onSubmit={onSubmit}>
           <label>
             <span className="field-label">Account type</span>
-            <select onChange={(event) => onChange('role', event.target.value)} value={authForm.role}>
+            <AppSelect onChange={(event) => onChange('role', event.target.value)} value={authForm.role}>
               {roles.map((roleOption) => <option key={roleOption} value={roleOption}>{roleOption}</option>)}
-            </select>
+            </AppSelect>
           </label>
           {hasShopAdmin && authForm.role !== 'shop' ? (
             <div className="info-line">
@@ -701,7 +765,7 @@ function TeamAdminCard({ authBusy, onPromote, onRefresh, profiles }) {
                 <td>{teamMember.role}</td>
                 <td>{teamMember.is_admin ? 'Yes' : 'No'}</td>
                 <td>
-                  <select
+                  <AppSelect
                     disabled={authBusy}
                     value={teamMember.tier || 'free'}
                     onChange={(e) => onPromote(teamMember, { tier: e.target.value })}
@@ -709,7 +773,7 @@ function TeamAdminCard({ authBusy, onPromote, onRefresh, profiles }) {
                     <option value="free">free</option>
                     <option value="garage">garage</option>
                     <option value="shop">shop</option>
-                  </select>
+                  </AppSelect>
                 </td>
                 <td>
                   <div className="row-actions">
@@ -2237,7 +2301,7 @@ function App() {
               <div className="card-title">Add build</div>
               <form className="form-grid three" onSubmit={addBuild}>
                 <input onChange={(event) => setNewBuild({ ...newBuild, name: event.target.value })} placeholder="Build name" value={newBuild.name} />
-                <select
+                <AppSelect
                   onChange={(event) => {
                     const vt = event.target.value
                     const firstMake = getMakeOptions(vt)[0]
@@ -2247,23 +2311,23 @@ function App() {
                   value={newBuild.vehicleType}
                 >
                   {vehicleTypes.map((vehicleType) => <option key={vehicleType} value={vehicleType}>{vehicleType}</option>)}
-                </select>
-                <select onChange={(event) => setNewBuild({ ...newBuild, vehicleYear: event.target.value })} value={newBuild.vehicleYear}>
+                </AppSelect>
+                <AppSelect onChange={(event) => setNewBuild({ ...newBuild, vehicleYear: event.target.value })} value={newBuild.vehicleYear}>
                   <option value="">Year</option>
                   {years.map((year) => <option key={year} value={year}>{year}</option>)}
-                </select>
-                <select
+                </AppSelect>
+                <AppSelect
                   onChange={(event) => setNewBuild({ ...newBuild, vehicleMake: event.target.value, vehicleModel: getModelOptions(event.target.value)[0] })}
                   value={newBuild.vehicleMake}
                 >
                   {getMakeOptions(newBuild.vehicleType).map((make) => <option key={make} value={make}>{make}</option>)}
-                </select>
-                <select onChange={(event) => setNewBuild({ ...newBuild, vehicleModel: event.target.value })} value={newBuild.vehicleModel}>
+                </AppSelect>
+                <AppSelect onChange={(event) => setNewBuild({ ...newBuild, vehicleModel: event.target.value })} value={newBuild.vehicleModel}>
                   {getModelOptions(newBuild.vehicleMake).map((model) => <option key={model} value={model}>{model}</option>)}
-                </select>
-                <select onChange={(event) => setNewBuild({ ...newBuild, status: event.target.value })} value={newBuild.status}>
+                </AppSelect>
+                <AppSelect onChange={(event) => setNewBuild({ ...newBuild, status: event.target.value })} value={newBuild.status}>
                   {buildStatuses.map((status) => <option key={status}>{status}</option>)}
-                </select>
+                </AppSelect>
                 <button className="button primary" type="submit">Create build</button>
               </form>
             </article>
@@ -2281,7 +2345,7 @@ function App() {
                     placeholder="Task title"
                     value={newTask.title}
                   />
-                  <select
+                  <AppSelect
                     onChange={(e) => setNewTask({ ...newTask, partId: e.target.value })}
                     value={newTask.partId}
                   >
@@ -2289,7 +2353,7 @@ function App() {
                     {activeBuild.parts.map((p) => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
-                  </select>
+                  </AppSelect>
                   <input
                     type="date"
                     onChange={(e) => setNewTask({ ...newTask, deadline: e.target.value })}
@@ -2396,19 +2460,19 @@ function App() {
                 <div className="card-title">Add part</div>
                 <form className="form-grid six" onSubmit={addPart}>
                   <input onChange={(event) => setNewPart({ ...newPart, name: event.target.value })} placeholder="Part name" value={newPart.name} />
-                  <select onChange={(event) => setNewPart({ ...newPart, category: event.target.value })} value={newPart.category}>
+                  <AppSelect onChange={(event) => setNewPart({ ...newPart, category: event.target.value })} value={newPart.category}>
                     {partCategoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
-                  </select>
-                  <select onChange={(event) => setNewPart({ ...newPart, source: event.target.value })} value={newPart.source}>
+                  </AppSelect>
+                  <AppSelect onChange={(event) => setNewPart({ ...newPart, source: event.target.value })} value={newPart.source}>
                     {partSources.map((source) => <option key={source} value={source}>{source}</option>)}
-                  </select>
+                  </AppSelect>
                   <input onChange={(event) => setNewPart({ ...newPart, vendor: event.target.value })} placeholder="Vendor / brand" value={newPart.vendor} />
                   <input onChange={(event) => setNewPart({ ...newPart, supplier: event.target.value })} placeholder="Supplier" value={newPart.supplier} />
                   <input min="1" onChange={(event) => setNewPart({ ...newPart, qty: event.target.value })} type="number" value={newPart.qty} />
                   <input min="0" onChange={(event) => setNewPart({ ...newPart, unitCost: event.target.value })} placeholder="Unit cost" step="0.01" type="number" value={newPart.unitCost} />
-                  <select onChange={(event) => setNewPart({ ...newPart, status: event.target.value })} value={newPart.status}>
+                  <AppSelect onChange={(event) => setNewPart({ ...newPart, status: event.target.value })} value={newPart.status}>
                     {partsStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
-                  </select>
+                  </AppSelect>
                   <textarea onChange={(event) => setNewPart({ ...newPart, notes: event.target.value })} placeholder="Notes" rows="2" value={newPart.notes} />
                   {hasGarageTier ? (
                     <label className="photo-upload-field">
@@ -2429,10 +2493,10 @@ function App() {
                 <div className="card-title">Parts list</div>
                 <div className="toolbar-controls">
                   <input onChange={(event) => setPartsQuery(event.target.value)} placeholder="Search parts" value={partsQuery} />
-                  <select onChange={(event) => setPartsFilter(event.target.value)} value={partsFilter}>
+                  <AppSelect onChange={(event) => setPartsFilter(event.target.value)} value={partsFilter}>
                     <option value="all">All statuses</option>
                     {partsStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
-                  </select>
+                  </AppSelect>
                 </div>
               </div>
               <div className="table-wrap">
@@ -2453,14 +2517,14 @@ function App() {
                               <textarea value={editDraft.notes} onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })} placeholder="Notes" rows="2" style={{ marginTop: '6px' }} />
                             </td>
                             <td>
-                              <select value={editDraft.category} onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })}>
+                              <AppSelectvalue={editDraft.category} onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })}>
                                 {partCategoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
-                              </select>
+                              </AppSelect>
                             </td>
                             <td>
-                              <select value={editDraft.source} onChange={(e) => setEditDraft({ ...editDraft, source: e.target.value })}>
+                              <AppSelectvalue={editDraft.source} onChange={(e) => setEditDraft({ ...editDraft, source: e.target.value })}>
                                 {partSources.map((s) => <option key={s} value={s}>{s}</option>)}
-                              </select>
+                              </AppSelect>
                             </td>
                             <td>
                               <input value={editDraft.vendor} onChange={(e) => setEditDraft({ ...editDraft, vendor: e.target.value })} placeholder="Vendor" />
@@ -2470,9 +2534,9 @@ function App() {
                             <td><input type="number" min="0" step="0.01" value={editDraft.unitCost} onChange={(e) => setEditDraft({ ...editDraft, unitCost: e.target.value })} style={{ minWidth: '80px' }} /></td>
                             <td>{money.format(Number(editDraft.qty || 0) * Number(editDraft.unitCost || 0))}</td>
                             <td>
-                              <select value={editDraft.status} onChange={(e) => setEditDraft({ ...editDraft, status: e.target.value })}>
+                              <AppSelectvalue={editDraft.status} onChange={(e) => setEditDraft({ ...editDraft, status: e.target.value })}>
                                 {partsStatuses.map((s) => <option key={s} value={s}>{s}</option>)}
-                              </select>
+                              </AppSelect>
                             </td>
                             <td>
                               <div className="row-actions">
@@ -2551,32 +2615,32 @@ function App() {
                     <div className="wire-endpoint-row">
                       <div className="wire-endpoint">
                         <label className="wire-endpoint-label">From</label>
-                        <select onChange={(e) => setNewPin({ ...newPin, fromConnectorId: e.target.value })} value={newPin.fromConnectorId}>
+                        <AppSelect onChange={(e) => setNewPin({ ...newPin, fromConnectorId: e.target.value })} value={newPin.fromConnectorId}>
                           <option value="">— connector —</option>
                           {(activeBuild.connectors || []).map((c) => (
                             <option key={c.id} value={c.id}>{c.name}</option>
                           ))}
-                        </select>
+                        </AppSelect>
                         <input onChange={(e) => setNewPin({ ...newPin, fromPin: e.target.value })} placeholder="Pin / terminal" value={newPin.fromPin} />
                       </div>
                       <div className="wire-arrow">→</div>
                       <div className="wire-endpoint">
                         <label className="wire-endpoint-label">To</label>
-                        <select onChange={(e) => setNewPin({ ...newPin, toConnectorId: e.target.value })} value={newPin.toConnectorId}>
+                        <AppSelect onChange={(e) => setNewPin({ ...newPin, toConnectorId: e.target.value })} value={newPin.toConnectorId}>
                           <option value="">— connector —</option>
                           {(activeBuild.connectors || []).map((c) => (
                             <option key={c.id} value={c.id}>{c.name}</option>
                           ))}
-                        </select>
+                        </AppSelect>
                         <input onChange={(e) => setNewPin({ ...newPin, toPin: e.target.value })} placeholder="Pin / terminal" value={newPin.toPin} />
                       </div>
                     </div>
                     {/* Wire info row */}
                     <div className="form-grid four" style={{ marginTop: '10px' }}>
                       <input onChange={(e) => setNewPin({ ...newPin, function: e.target.value })} placeholder="Signal / function" value={newPin.function} />
-                      <select onChange={(e) => setNewPin({ ...newPin, type: e.target.value })} value={newPin.type}>
+                      <AppSelect onChange={(e) => setNewPin({ ...newPin, type: e.target.value })} value={newPin.type}>
                         {pinTypes.map((type) => <option key={type} value={type}>{type}</option>)}
-                      </select>
+                      </AppSelect>
                       <input onChange={(e) => setNewPin({ ...newPin, wireGauge: e.target.value })} placeholder="Wire gauge (18AWG)" value={newPin.wireGauge} />
                       <input onChange={(e) => setNewPin({ ...newPin, wireColor: e.target.value })} placeholder="Wire color" value={newPin.wireColor} />
                       <button className="button primary" type="submit">Add wire</button>
@@ -2773,15 +2837,15 @@ function App() {
                   <form className="form-grid six" onSubmit={addTune}>
                     <input onChange={(event) => setNewTune({ ...newTune, version: event.target.value })} placeholder="Version" value={newTune.version} />
                     <input onChange={(event) => setNewTune({ ...newTune, name: event.target.value })} placeholder="Tune name" value={newTune.name} />
-                    <select onChange={(event) => setNewTune({ ...newTune, ecuPlatform: event.target.value })} value={newTune.ecuPlatform}>
+                    <AppSelect onChange={(event) => setNewTune({ ...newTune, ecuPlatform: event.target.value })} value={newTune.ecuPlatform}>
                       {ecuPlatforms.map((platform) => <option key={platform} value={platform}>{platform}</option>)}
-                    </select>
-                    <select onChange={(event) => setNewTune({ ...newTune, tuneType: event.target.value })} value={newTune.tuneType}>
+                    </AppSelect>
+                    <AppSelect onChange={(event) => setNewTune({ ...newTune, tuneType: event.target.value })} value={newTune.tuneType}>
                       {tuneTypes.map((tuneType) => <option key={tuneType} value={tuneType}>{tuneType}</option>)}
-                    </select>
-                    <select onChange={(event) => setNewTune({ ...newTune, status: event.target.value })} value={newTune.status}>
+                    </AppSelect>
+                    <AppSelect onChange={(event) => setNewTune({ ...newTune, status: event.target.value })} value={newTune.status}>
                       {tuneStatuses.map((status) => <option key={status}>{status}</option>)}
-                    </select>
+                    </AppSelect>
                     <input onChange={(event) => setNewTune({ ...newTune, power: event.target.value })} placeholder="WHP" type="number" value={newTune.power} />
                     <input onChange={(event) => setNewTune({ ...newTune, torque: event.target.value })} placeholder="WTQ" type="number" value={newTune.torque} />
                     <input onChange={(event) => setNewTune({ ...newTune, boost: event.target.value })} placeholder="Boost PSI" step="0.5" type="number" value={newTune.boost} />
@@ -2835,17 +2899,17 @@ function App() {
                     <div className="info-line">Review channels from {pendingLogImport.fileName}</div>
                     <label>
                       <span className="field-label">Delimiter</span>
-                      <select onChange={(event) => setPendingLogImport((current) => ({ ...current, delimiter: event.target.value, ...parseDataLogText(current.text, event.target.value) }))} value={pendingLogImport.delimiter}>
+                      <AppSelect onChange={(event) => setPendingLogImport((current) => ({ ...current, delimiter: event.target.value, ...parseDataLogText(current.text, event.target.value) }))} value={pendingLogImport.delimiter}>
                         <option value=",">Comma</option>
                         <option value=";">Semicolon</option>
-                      </select>
+                      </AppSelect>
                     </label>
                     <label>
                       <span className="field-label">Time column</span>
-                      <select onChange={(event) => setPendingLogImport((current) => ({ ...current, timeColumn: event.target.value }))} value={pendingLogImport.timeColumn}>
+                      <AppSelect onChange={(event) => setPendingLogImport((current) => ({ ...current, timeColumn: event.target.value }))} value={pendingLogImport.timeColumn}>
                         <option value="">Select time column</option>
                         {pendingLogImport.headers.map((header) => <option key={header} value={header}>{header}</option>)}
-                      </select>
+                      </AppSelect>
                     </label>
                     <div className="channel-chip-list">
                       {pendingLogImport.headers.map((header) => <span className="pill neutral" key={header}>{header}</span>)}
@@ -2862,10 +2926,10 @@ function App() {
                       {[0, 1, 2, 3].map((index) => (
                         <label key={index}>
                           <span className="field-label">Channel {index + 1}</span>
-                          <select onChange={(event) => updateSelectedLogChannel(index, event.target.value)} value={selectedLogChannels[index] || ''}>
+                          <AppSelect onChange={(event) => updateSelectedLogChannel(index, event.target.value)} value={selectedLogChannels[index] || ''}>
                             <option value="">None</option>
                             {availableLogChannels.map((channel) => <option key={channel} value={channel}>{channel}</option>)}
-                          </select>
+                          </AppSelect>
                         </label>
                       ))}
                     </div>
@@ -3065,15 +3129,15 @@ function App() {
                 <div className="card-title">Active build details</div>
                 <div className="form-grid two">
                   <label><span className="field-label">Build name</span><input onChange={(event) => updateBuildField('name', event.target.value)} value={activeBuild.name} /></label>
-                  <label><span className="field-label">Vehicle type</span><select onChange={(event) => updateActiveBuild((build) => { const vehicleType = event.target.value; const vehicleMake = getMakeOptions(vehicleType)[0]; const vehicleModel = getModelOptions(vehicleMake)[0]; const next = { ...build, vehicleType, vehicleMake, vehicleModel, updatedAt: new Date().toISOString() }; next.vehicle = getVehicleLabel(next); return next })} value={activeBuild.vehicleType || 'Truck'}>{vehicleTypes.map((vehicleType) => <option key={vehicleType} value={vehicleType}>{vehicleType}</option>)}</select></label>
-                  <label><span className="field-label">Vehicle year</span><select onChange={(event) => updateBuildVehicleField('vehicleYear', event.target.value)} value={activeBuild.vehicleYear || ''}><option value="">Year</option>{years.map((year) => <option key={year} value={year}>{year}</option>)}</select></label>
-                  <label><span className="field-label">Vehicle make</span><select onChange={(event) => updateActiveBuild((build) => { const vehicleMake = event.target.value; const vehicleModel = getModelOptions(vehicleMake)[0]; const next = { ...build, vehicleMake, vehicleModel, updatedAt: new Date().toISOString() }; next.vehicle = getVehicleLabel(next); return next })} value={activeBuild.vehicleMake || getMakeOptions(activeBuild.vehicleType || 'Truck')[0]}>{getMakeOptions(activeBuild.vehicleType || 'Truck').map((make) => <option key={make} value={make}>{make}</option>)}</select></label>
-                  <label><span className="field-label">Vehicle model</span><select onChange={(event) => updateBuildVehicleField('vehicleModel', event.target.value)} value={activeBuild.vehicleModel || getModelOptions(activeBuild.vehicleMake || getMakeOptions(activeBuild.vehicleType || 'Truck')[0])[0]}>{getModelOptions(activeBuild.vehicleMake || getMakeOptions(activeBuild.vehicleType || 'Truck')[0]).map((model) => <option key={model} value={model}>{model}</option>)}</select></label>
-                  <label><span className="field-label">Build status</span><select onChange={(event) => updateBuildField('status', event.target.value)} value={activeBuild.status}>{buildStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
+                  <label><span className="field-label">Vehicle type</span><AppSelect onChange={(event) => updateActiveBuild((build) => { const vehicleType = event.target.value; const vehicleMake = getMakeOptions(vehicleType)[0]; const vehicleModel = getModelOptions(vehicleMake)[0]; const next = { ...build, vehicleType, vehicleMake, vehicleModel, updatedAt: new Date().toISOString() }; next.vehicle = getVehicleLabel(next); return next })} value={activeBuild.vehicleType || 'Truck'}>{vehicleTypes.map((vehicleType) => <option key={vehicleType} value={vehicleType}>{vehicleType}</option>)}</AppSelect></label>
+                  <label><span className="field-label">Vehicle year</span><AppSelect onChange={(event) => updateBuildVehicleField('vehicleYear', event.target.value)} value={activeBuild.vehicleYear || ''}><option value="">Year</option>{years.map((year) => <option key={year} value={year}>{year}</option>)}</AppSelect></label>
+                  <label><span className="field-label">Vehicle make</span><AppSelect onChange={(event) => updateActiveBuild((build) => { const vehicleMake = event.target.value; const vehicleModel = getModelOptions(vehicleMake)[0]; const next = { ...build, vehicleMake, vehicleModel, updatedAt: new Date().toISOString() }; next.vehicle = getVehicleLabel(next); return next })} value={activeBuild.vehicleMake || getMakeOptions(activeBuild.vehicleType || 'Truck')[0]}>{getMakeOptions(activeBuild.vehicleType || 'Truck').map((make) => <option key={make} value={make}>{make}</option>)}</AppSelect></label>
+                  <label><span className="field-label">Vehicle model</span><AppSelect onChange={(event) => updateBuildVehicleField('vehicleModel', event.target.value)} value={activeBuild.vehicleModel || getModelOptions(activeBuild.vehicleMake || getMakeOptions(activeBuild.vehicleType || 'Truck')[0])[0]}>{getModelOptions(activeBuild.vehicleMake || getMakeOptions(activeBuild.vehicleType || 'Truck')[0]).map((model) => <option key={model} value={model}>{model}</option>)}</AppSelect></label>
+                  <label><span className="field-label">Build status</span><AppSelect onChange={(event) => updateBuildField('status', event.target.value)} value={activeBuild.status}>{buildStatuses.map((status) => <option key={status}>{status}</option>)}</AppSelect></label>
                   <label><span className="field-label">Budget target</span><input onChange={(event) => updateBuildBudget(event.target.value)} type="number" value={activeBuild.budget.target} /></label>
                   <label><span className="field-label">Client name</span><input onChange={(event) => updateClientField('name', event.target.value)} value={activeBuild.client.name} /></label>
                   <label><span className="field-label">Client email</span><input onChange={(event) => updateClientField('email', event.target.value)} value={activeBuild.client.email} /></label>
-                  <label><span className="field-label">Portal status</span><select onChange={(event) => updateClientField('portalStatus', event.target.value)} value={activeBuild.client.portalStatus}>{portalStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
+                  <label><span className="field-label">Portal status</span><AppSelect onChange={(event) => updateClientField('portalStatus', event.target.value)} value={activeBuild.client.portalStatus}>{portalStatuses.map((status) => <option key={status}>{status}</option>)}</AppSelect></label>
                   <label className="span-two"><span className="field-label">Build brief</span><textarea onChange={(event) => updateBuildField('brief', event.target.value)} rows="3" value={activeBuild.brief} /></label>
                   <label className="span-two"><span className="field-label">Next milestone</span><textarea onChange={(event) => updateBuildField('nextMilestone', event.target.value)} rows="3" value={activeBuild.nextMilestone} /></label>
                   <label className="span-two"><span className="field-label">Customer portal summary</span><textarea onChange={(event) => updateBuildField('portalSummary', event.target.value)} rows="3" value={activeBuild.portalSummary} /></label>
