@@ -656,7 +656,7 @@ function AuthScreen({
             <>
               <label>
                 <span className="field-label">Account type</span>
-                <AppSelectdisabled={hasShopAdmin} onChange={(event) => onAuthFormChange('role', event.target.value)} value={hasShopAdmin ? 'customer' : authForm.role}>
+                <AppSelect disabled={hasShopAdmin} onChange={(event) => onAuthFormChange('role', event.target.value)} value={hasShopAdmin ? 'customer' : authForm.role}>
                   {roles.map((roleOption) => <option key={roleOption} value={roleOption}>{roleOption}</option>)}
                 </AppSelect>
               </label>
@@ -2518,12 +2518,12 @@ function App() {
                               <textarea value={editDraft.notes} onChange={(e) => setEditDraft({ ...editDraft, notes: e.target.value })} placeholder="Notes" rows="2" style={{ marginTop: '6px' }} />
                             </td>
                             <td>
-                              <AppSelectvalue={editDraft.category} onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })}>
+                              <AppSelect value={editDraft.category} onChange={(e) => setEditDraft({ ...editDraft, category: e.target.value })}>
                                 {partCategoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
                               </AppSelect>
                             </td>
                             <td>
-                              <AppSelectvalue={editDraft.source} onChange={(e) => setEditDraft({ ...editDraft, source: e.target.value })}>
+                              <AppSelect value={editDraft.source} onChange={(e) => setEditDraft({ ...editDraft, source: e.target.value })}>
                                 {partSources.map((s) => <option key={s} value={s}>{s}</option>)}
                               </AppSelect>
                             </td>
@@ -2535,7 +2535,7 @@ function App() {
                             <td><input type="number" min="0" step="0.01" value={editDraft.unitCost} onChange={(e) => setEditDraft({ ...editDraft, unitCost: e.target.value })} style={{ minWidth: '80px' }} /></td>
                             <td>{money.format(Number(editDraft.qty || 0) * Number(editDraft.unitCost || 0))}</td>
                             <td>
-                              <AppSelectvalue={editDraft.status} onChange={(e) => setEditDraft({ ...editDraft, status: e.target.value })}>
+                              <AppSelect value={editDraft.status} onChange={(e) => setEditDraft({ ...editDraft, status: e.target.value })}>
                                 {partsStatuses.map((s) => <option key={s} value={s}>{s}</option>)}
                               </AppSelect>
                             </td>
