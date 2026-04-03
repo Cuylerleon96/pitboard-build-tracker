@@ -208,6 +208,73 @@ td span {
   text-align: center;
 }
 
+/* Billing tier cards */
+.section-grid.billing-tiers {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.billing-tier-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.billing-tier-card.active {
+  border-color: var(--accent, #f97316);
+  background: rgba(249, 115, 22, 0.07);
+}
+
+.billing-tier-name {
+  font-weight: 600;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: capitalize;
+}
+
+.billing-current-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: var(--accent, #f97316);
+  color: #000;
+  border-radius: 20px;
+  padding: 2px 8px;
+}
+
+.billing-feature-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.billing-feature-list li {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+}
+
+.billing-feature-list li::before {
+  content: '✓ ';
+  color: var(--accent, #f97316);
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .section-grid.billing-tiers {
+    grid-template-columns: 1fr;
+  }
+}
+
 .notice {
   margin-bottom: 14px;
   border-color: rgba(249, 115, 22, 0.3);
@@ -373,6 +440,19 @@ td span {
   background: rgba(249, 115, 22, 0.06);
 }
 
+.editing-row td {
+  background: rgba(249, 115, 22, 0.05);
+  vertical-align: top;
+}
+
+.editing-row input,
+.editing-row select,
+.editing-row textarea {
+  padding: 7px 10px;
+  font-size: 0.88rem;
+  border-radius: 10px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -535,4 +615,336 @@ label {
   .top-nav {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Task cards (Tasks tab) ── */
+
+.task-list {
+  display: grid;
+  gap: 10px;
+}
+
+.task-card {
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
+  transition: border-color 140ms ease;
+}
+
+.task-card.task-status-in_progress {
+  border-left: 3px solid var(--accent);
+  background: rgba(249, 115, 22, 0.03);
+}
+
+.task-card.task-status-done {
+  border-left: 3px solid var(--success);
+  opacity: 0.7;
+}
+
+.task-card.task-status-open {
+  border-left: 3px solid rgba(255, 255, 255, 0.2);
+}
+
+.task-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.task-card-header:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.task-card-title {
+  flex: 1;
+  display: grid;
+  gap: 4px;
+}
+
+.task-card-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 0.82rem;
+  color: var(--text-soft);
+  flex-wrap: wrap;
+}
+
+.task-expand-icon {
+  font-size: 0.7rem;
+  color: var(--text-soft);
+}
+
+.task-card-body {
+  padding: 14px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: grid;
+  gap: 14px;
+}
+
+.task-details-block p {
+  margin: 6px 0 0;
+  color: var(--text-soft);
+  line-height: 1.6;
+}
+
+/* ── Dashboard task board ── */
+
+.dashboard-task-board {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.dashboard-task-col {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.dashboard-task-col-label {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  margin-bottom: 2px;
+}
+
+.dashboard-task-chip {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.dashboard-task-chip:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.dashboard-task-chip.task-status-in_progress {
+  border-left: 3px solid var(--accent);
+  background: rgba(249, 115, 22, 0.05);
+}
+
+.dashboard-task-chip span {
+  font-size: 0.8rem;
+  color: var(--text-soft);
+}
+
+.dashboard-task-note {
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 640px) {
+  .dashboard-task-board {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Wire endpoint form ─────────────────────────────────── */
+
+.wire-endpoint-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.wire-endpoint {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+  min-width: 180px;
+}
+
+.wire-endpoint-label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.wire-arrow {
+  font-size: 1.4rem;
+  color: var(--accent);
+  font-weight: 700;
+  padding-bottom: 6px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* ── Connector / Wiring ─────────────────────────────────── */
+
+.connector-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.connector-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.85rem;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.connector-chip:hover {
+  border-color: rgba(249, 115, 22, 0.36);
+  background: rgba(249, 115, 22, 0.07);
+}
+
+.connector-chip-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.connector-chip-desc {
+  color: var(--text-soft);
+  font-size: 0.78rem;
+}
+
+.connector-chip-count {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--accent-strong);
+  background: rgba(249, 115, 22, 0.12);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.connector-chip-del {
+  background: none;
+  border: none;
+  color: var(--text-soft);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.connector-chip-del:hover {
+  color: #ff6b6b;
+}
+
+/* Connector sections in pin map */
+
+.connector-sections {
+  display: grid;
+  gap: 16px;
+}
+
+.connector-section {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.connector-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  user-select: none;
+  transition: background 120ms ease;
+}
+
+.connector-section-header:hover {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.connector-section-title {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.connector-section-desc {
+  color: var(--text-soft);
+  font-size: 0.8rem;
+}
+
+.connector-section-meta {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--accent-strong);
+}
+
+.connector-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.connector-table th,
+.connector-table td {
+  padding: 9px 12px;
+  text-align: left;
+  font-size: 0.82rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.connector-table th {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.connector-table tr:last-child td {
+  border-bottom: none;
+}
+
+.connector-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text-soft);
+}
+
+.connector-tag.good {
+  background: rgba(82, 208, 141, 0.15);
+  color: var(--success);
+}
+
+.connector-tag.warn {
+  background: rgba(249, 115, 22, 0.15);
+  color: var(--accent-strong);
+}
+
+.connector-tag.bad {
+  background: rgba(255, 80, 80, 0.12);
+  color: #ff8080;
+}
+
+.connector-move-select {
+  font-size: 0.78rem;
+  padding: 4px 8px;
+  border-radius: 8px;
+  width: auto;
 }
