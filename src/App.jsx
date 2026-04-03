@@ -640,6 +640,9 @@ function AuthScreen({
 }
 
 function ProfileSetupScreen({ authBusy, authForm, hasShopAdmin, onChange, onSubmit, userEmail }) {
+  // If a shop admin already exists but THIS user has no profile, they may be the
+  // original owner signing in on a new session. Allow them to reclaim the shop role.
+  const lockedOut = hasShopAdmin && authForm.role !== 'shop'
   return (
     <div className="workspace-shell auth-shell">
       <div className="auth-panel">
@@ -650,20 +653,20 @@ function ProfileSetupScreen({ authBusy, authForm, hasShopAdmin, onChange, onSubm
         <form className="stack-form auth-form" onSubmit={onSubmit}>
           <label>
             <span className="field-label">Account type</span>
-            <select disabled={hasShopAdmin} onChange={(event) => onChange('role', event.target.value)} value={hasShopAdmin ? 'customer' : authForm.role}>
+            <select onChange={(event) => onChange('role', event.target.value)} value={authForm.role}>
               {roles.map((roleOption) => <option key={roleOption} value={roleOption}>{roleOption}</option>)}
             </select>
           </label>
-          {hasShopAdmin ? (
+          {hasShopAdmin && authForm.role !== 'shop' ? (
             <div className="info-line">
-              This project already has a shop admin. Finish setup as a customer account, then an admin can promote you if needed.
+              A shop admin account already exists. If you are the shop owner, switch the type above to <strong>shop</strong>. Otherwise finish as a customer and an admin can promote you.
             </div>
           ) : null}
           <label>
             <span className="field-label">Your name</span>
             <input onChange={(event) => onChange('fullName', event.target.value)} placeholder="Your name" value={authForm.fullName} />
           </label>
-          {!hasShopAdmin && authForm.role === 'shop' ? (
+          {authForm.role === 'shop' ? (
             <label>
               <span className="field-label">Shop name</span>
               <input onChange={(event) => onChange('shopName', event.target.value)} placeholder="Shop name" value={authForm.shopName} />
@@ -1070,11 +1073,8 @@ function App() {
     window.localStorage.setItem('pitboard-portal-mode', portalMode)
   }, [portalMode, role])
 
-  useEffect(() => {
-    if (hasShopAdmin && !profile && authForm.role !== 'customer') {
-      setAuthForm((current) => ({ ...current, role: 'customer' }))
-    }
-  }, [authForm.role, hasShopAdmin, profile])
+  // (removed: old effect that forced customer role when shop admin existed —
+  //  this blocked the owner from reclaiming their admin account on a fresh session)
 
   const activeBuild = useMemo(
     () => workspace.builds.find((build) => build.id === activeBuildId) ?? workspace.builds[0] ?? emptyBuild,
@@ -1812,14 +1812,17 @@ function App() {
     if (!user) return { ok: false, message: 'No active session found.' }
 
     const nextRole = overrides.role || authForm.role
-    const bootstrappingFirstShopAdmin = !hasShopAdmin && !profile && nextRole === 'shop'
+    // Grant admin when: (a) no shop admin exists yet and this is a shop setup, or
+    // (b) user has no profile at all and is claiming shop — covers the orphaned-admin
+    //     recovery case where a valid owner signs in on a fresh session.
+    const claimingShop = nextRole === 'shop' && !profile
     const currentIsAdmin = profile?.is_admin || false
 
     const nextProfile = {
       id: user.id,
       email: user.email || authForm.email.trim(),
       role: nextRole,
-      is_admin: overrides.isAdmin ?? (bootstrappingFirstShopAdmin ? true : currentIsAdmin),
+      is_admin: overrides.isAdmin ?? (claimingShop ? true : currentIsAdmin),
       full_name: (overrides.fullName ?? authForm.fullName).trim(),
       shop_name: (overrides.shopName ?? authForm.shopName).trim(),
     }
@@ -1907,10 +1910,7 @@ function App() {
       setNotice('Add a shop name for the shop account.')
       return
     }
-    if (hasShopAdmin && authForm.role === 'shop' && !profile?.is_admin) {
-      setNotice('This account cannot self-assign as shop. Ask a shop admin to promote it.')
-      return
-    }
+    // Allow shop role claim from setup screen — is_admin logic in persistProfile handles it
 
     setAuthBusy(true)
     try {

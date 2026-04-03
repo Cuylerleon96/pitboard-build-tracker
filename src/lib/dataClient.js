@@ -55,7 +55,7 @@ export function subscribeToAuth(callback) {
   if (!supabase) return { unsubscribe() {} }
   const {
     data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, session) => callback(session))
+  } = supabase.auth.onAuthStateChange((event, session) => callback(event, session))
   return subscription
 }
 
@@ -116,7 +116,9 @@ export async function getHasShopAdmin() {
 
 export async function signOut() {
   if (!supabase) return
-  await supabase.auth.signOut()
+  // scope: 'local' clears the local session immediately without a network round-trip,
+  // avoiding races where the server request fails or a concurrent token refresh fires.
+  await supabase.auth.signOut({ scope: 'local' })
 }
 
 export async function loadWorkspace(userId) {
@@ -159,7 +161,25 @@ export async function loadWorkspace(userId) {
             photos: [],
             ...part,
           })) ?? [],
-          pins: row.data?.pins?.map((pin) => ({ wireGauge: '', wireColor: '', ...pin })) ?? [],
+          connectors: row.data?.connectors ?? [],
+          pins: row.data?.pins?.map((pin) => {
+            // Migrate legacy single-endpoint pins (connectorId + pin) to two-endpoint model
+            if (pin.connectorId !== undefined || pin.pin !== undefined) {
+              return {
+                fromConnectorId: pin.connectorId ?? null,
+                fromPin: pin.pin ?? '',
+                toConnectorId: null,
+                toPin: '',
+                function: pin.function ?? '',
+                type: pin.type ?? 'Other',
+                wireGauge: pin.wireGauge ?? '',
+                wireColor: pin.wireColor ?? '',
+                verified: pin.verified ?? false,
+                id: pin.id,
+              }
+            }
+            return { fromConnectorId: null, fromPin: '', toConnectorId: null, toPin: '', wireGauge: '', wireColor: '', ...pin }
+          }) ?? [],
           tunes: row.data?.tunes?.map((tune) => ({
             ecuPlatform: 'Other',
             tuneType: 'Other',
@@ -176,6 +196,7 @@ export async function loadWorkspace(userId) {
             journal: [],
           },
           journal: row.data?.journal?.map((entry) => ({ photos: [], ...entry })) ?? [],
+          tasks: row.data?.tasks?.map((t) => ({ photos: [], notes: '', ...t })) ?? [],
         })),
       }
     }
@@ -227,16 +248,32 @@ export async function listProfiles() {
 
 export async function upsertProfile(profile) {
   if (!supabase) return { ok: false, message: 'Supabase is not configured yet.' }
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { ok: false, message: 'No active session.' }
-  if (profile.id && profile.id !== user.id) return { ok: false, message: 'Cannot modify another user\'s profile.' }
-  const { error } = await supabase.from('profiles').upsert({
-    ...profile,
-    id: user.id,
-    updated_at: new Date().toISOString(),
-  })
-  if (error) return { ok: false, message: error.message }
-  return { ok: true }
+
+  // Wrap the whole call in a timeout so the UI never hangs indefinitely
+  const timeout = new Promise((_, reject) =>
+    window.setTimeout(() => reject(new Error('Request timed out. Check your connection and try again.')), 10000),
+  )
+
+  try {
+    const result = await Promise.race([
+      (async () => {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { ok: false, message: 'No active session.' }
+        if (profile.id && profile.id !== user.id) return { ok: false, message: 'Cannot modify another user\'s profile.' }
+        const { error } = await supabase.from('profiles').upsert({
+          ...profile,
+          id: user.id,
+          updated_at: new Date().toISOString(),
+        })
+        if (error) return { ok: false, message: error.message }
+        return { ok: true }
+      })(),
+      timeout,
+    ])
+    return result
+  } catch (err) {
+    return { ok: false, message: err.message || 'Unknown error saving profile.' }
+  }
 }
 
 export async function updateProfileByAdmin(profile) {
@@ -334,6 +371,7 @@ export async function saveBuild(build, userId) {
       vehicleModel: build.vehicleModel || '',
       phases: build.phases,
       parts: build.parts,
+      connectors: build.connectors || [],
       pins: build.pins,
       tunes: build.tunes,
       labor: build.labor || [],
@@ -346,6 +384,7 @@ export async function saveBuild(build, userId) {
         journal: [],
       },
       journal: build.journal,
+      tasks: build.tasks || [],
     },
   })
   if (error) console.error('[pitboard] saveBuild error:', error.message, error.code)
