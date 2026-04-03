@@ -13,6 +13,7 @@ import {
   loadWorkspace,
   openBillingPortal,
   saveBuild,
+  queueSave,
   saveWorkspaceLocal,
   signInWithGoogle,
   signInWithPassword,
@@ -1201,7 +1202,7 @@ function App() {
     if (authState.status === 'cloud' && authState.session?.user) {
       const targetBuildId = buildIdOverride ?? activeBuildId
       const targetBuild = nextWorkspace.builds.find((build) => build.id === targetBuildId) ?? nextWorkspace.builds[0]
-      if (targetBuild) saveBuild(targetBuild, authState.session.user.id)
+      if (targetBuild) queueSave(targetBuild, authState.session.user.id)
       return
     }
 
@@ -1262,7 +1263,7 @@ function App() {
     setWorkspace(nextWorkspace)
 
     if (authState.status === 'cloud' && authState.session?.user) {
-      nextWorkspace.builds.forEach((build) => saveBuild(build, authState.session.user.id))
+      nextWorkspace.builds.forEach((build) => queueSave(build, authState.session.user.id))
       return
     }
 

@@ -389,3 +389,15 @@ export async function saveBuild(build, userId) {
   })
   if (error) console.error('[pitboard] saveBuild error:', error.message, error.code)
 }
+
+// Serialize cloud saves to prevent lost updates
+let saveQueue = Promise.resolve()
+
+export function queueSave(build, userId) {
+  saveQueue = saveQueue
+    .then(() => saveBuild(build, userId))
+    .catch((err) => {
+      console.error('[pitboard] Queued save failed:', err)
+    })
+  return saveQueue
+}
