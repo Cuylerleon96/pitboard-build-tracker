@@ -55,7 +55,7 @@ export function subscribeToAuth(callback) {
   if (!supabase) return { unsubscribe() {} }
   const {
     data: { subscription },
-  } = supabase.auth.onAuthStateChange((event, session) => callback(event, session))
+  } = supabase.auth.onAuthStateChange((_event, session) => callback(session))
   return subscription
 }
 
@@ -116,9 +116,7 @@ export async function getHasShopAdmin() {
 
 export async function signOut() {
   if (!supabase) return
-  // scope: 'local' clears the local session immediately without a network round-trip,
-  // avoiding races where the server request fails or a concurrent token refresh fires.
-  await supabase.auth.signOut({ scope: 'local' })
+  await supabase.auth.signOut()
 }
 
 export async function loadWorkspace(userId) {
@@ -161,25 +159,7 @@ export async function loadWorkspace(userId) {
             photos: [],
             ...part,
           })) ?? [],
-          connectors: row.data?.connectors ?? [],
-          pins: row.data?.pins?.map((pin) => {
-            // Migrate legacy single-endpoint pins (connectorId + pin) to two-endpoint model
-            if (pin.connectorId !== undefined || pin.pin !== undefined) {
-              return {
-                fromConnectorId: pin.connectorId ?? null,
-                fromPin: pin.pin ?? '',
-                toConnectorId: null,
-                toPin: '',
-                function: pin.function ?? '',
-                type: pin.type ?? 'Other',
-                wireGauge: pin.wireGauge ?? '',
-                wireColor: pin.wireColor ?? '',
-                verified: pin.verified ?? false,
-                id: pin.id,
-              }
-            }
-            return { fromConnectorId: null, fromPin: '', toConnectorId: null, toPin: '', wireGauge: '', wireColor: '', ...pin }
-          }) ?? [],
+          pins: row.data?.pins?.map((pin) => ({ wireGauge: '', wireColor: '', ...pin })) ?? [],
           tunes: row.data?.tunes?.map((tune) => ({
             ecuPlatform: 'Other',
             tuneType: 'Other',
@@ -196,7 +176,6 @@ export async function loadWorkspace(userId) {
             journal: [],
           },
           journal: row.data?.journal?.map((entry) => ({ photos: [], ...entry })) ?? [],
-          tasks: row.data?.tasks?.map((t) => ({ photos: [], notes: '', ...t })) ?? [],
         })),
       }
     }
@@ -355,7 +334,6 @@ export async function saveBuild(build, userId) {
       vehicleModel: build.vehicleModel || '',
       phases: build.phases,
       parts: build.parts,
-      connectors: build.connectors || [],
       pins: build.pins,
       tunes: build.tunes,
       labor: build.labor || [],
@@ -368,7 +346,6 @@ export async function saveBuild(build, userId) {
         journal: [],
       },
       journal: build.journal,
-      tasks: build.tasks || [],
     },
   })
   if (error) console.error('[pitboard] saveBuild error:', error.message, error.code)
