@@ -55,7 +55,7 @@ export function subscribeToAuth(callback) {
   if (!supabase) return { unsubscribe() {} }
   const {
     data: { subscription },
-  } = supabase.auth.onAuthStateChange((_event, session) => callback(session))
+  } = supabase.auth.onAuthStateChange((event, session) => callback(event, session))
   return subscription
 }
 
@@ -116,7 +116,9 @@ export async function getHasShopAdmin() {
 
 export async function signOut() {
   if (!supabase) return
-  await supabase.auth.signOut()
+  // scope: 'local' clears the local session immediately without a network round-trip,
+  // avoiding races where the server request fails or a concurrent token refresh fires.
+  await supabase.auth.signOut({ scope: 'local' })
 }
 
 export async function loadWorkspace(userId) {
@@ -176,6 +178,7 @@ export async function loadWorkspace(userId) {
             journal: [],
           },
           journal: row.data?.journal?.map((entry) => ({ photos: [], ...entry })) ?? [],
+          tasks: row.data?.tasks?.map((t) => ({ photos: [], notes: '', ...t })) ?? [],
         })),
       }
     }
@@ -346,6 +349,7 @@ export async function saveBuild(build, userId) {
         journal: [],
       },
       journal: build.journal,
+      tasks: build.tasks || [],
     },
   })
   if (error) console.error('[pitboard] saveBuild error:', error.message, error.code)
