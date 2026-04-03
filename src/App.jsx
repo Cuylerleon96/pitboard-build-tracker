@@ -766,11 +766,17 @@ function App() {
       }
     })
 
-    const subscription = subscribeToAuth(async (session) => {
+    const subscription = subscribeToAuth(async (event, session) => {
       try {
+        // TOKEN_REFRESHED just means Supabase silently renewed the access token — no need
+        // to re-hydrate or show a notice. Ignoring it also prevents a race where a refresh
+        // fires just after sign-out and undoes the signed-out state.
+        if (event === 'TOKEN_REFRESHED') return
+
         if (session?.user) {
           await hydrateCloudSession(session)
-          setNotice('Cloud session connected.')
+          // Only show the notice on an actual new sign-in, not on the initial page load
+          if (event === 'SIGNED_IN') setNotice('Cloud session connected.')
           return
         }
 
