@@ -23,20 +23,163 @@ import {
   updateProfileByAdmin,
   upsertProfile,
 } from './lib/dataClient'
-import * as constants from './constants'
-import TechnicianNotes from './components/TechnicianNotes'
-import AppSelect from './components/AppSelect'
-import WiringDiagram from './components/WiringDiagram'
-import AuthScreen from './components/AuthScreen'
-import ProfileSetupScreen from './components/ProfileSetupScreen'
-import TeamAdminCard from './components/TeamAdminCard'
-import BillingCard from './components/BillingCard'
-import PortalModeToggle from './components/PortalModeToggle'
-import UpgradeHint from './components/UpgradeHint'
-import PhotoStrip from './components/PhotoStrip'
-import DataLogChart from './components/DataLogChart'
 
-const emptyBuild = {
+const partsStatuses = ['planned', 'quoted', 'ordered', 'received', 'installed', 'blocked']
+const tabs = ['dashboard', 'builds', 'tasks', 'parts', 'wiring', 'tunes', 'labor', 'journal', 'settings']
+const customerTabs = ['dashboard', 'parts', 'wiring', 'tunes', 'journal', 'settings']
+const taskStatuses = ['open', 'in_progress', 'done']
+const roles = ['shop', 'customer']
+const tiers = ['free', 'garage', 'shop']
+const vehicleTypes = ['Car', 'Truck', 'Motorcycle', 'UTV', 'Boat']
+const years = Array.from({ length: 48 }, (_, index) => String(new Date().getFullYear() + 1 - index))
+const makesByVehicleType = {
+  Car: ['Nissan', 'Ford', 'Chevrolet', 'Toyota', 'Honda', 'Dodge', 'Jeep', 'BMW', 'Mercedes-Benz', 'Subaru', 'Mazda', 'Mitsubishi', 'Other'],
+  Truck: ['Nissan', 'Ford', 'Chevrolet', 'Toyota', 'Honda', 'Dodge', 'Ram', 'GMC', 'Other'],
+  Motorcycle: ['Yamaha', 'Honda', 'Kawasaki', 'Suzuki', 'Ducati', 'Harley-Davidson', 'BMW', 'KTM', 'Royal Enfield', 'Triumph', 'Other'],
+  UTV: ['Polaris', 'Can-Am', 'Yamaha', 'Honda', 'Kawasaki', 'Arctic Cat', 'Textron', 'Other'],
+  Boat: ['Yamaha', 'Mercury', 'MerCruiser', 'Volvo Penta', 'Evinrude', 'Boston Whaler', 'Sea Ray', 'Other'],
+}
+const modelsByMake = {
+  // Cars / Trucks
+  Nissan: ['D21 Pickup', '240SX', '300ZX', '350Z', '370Z', 'Frontier', 'Pathfinder', 'Hardbody', 'Other'],
+  Ford: ['Mustang', 'F-150', 'F-250', 'Ranger', 'Bronco', 'Focus', 'Fusion', 'Other'],
+  Chevrolet: ['C10', 'C/K 1500', 'Silverado', 'Camaro', 'Corvette', 'S10', 'Blazer', 'Other'],
+  Toyota: ['Tacoma', 'Hilux', 'Tundra', 'Supra', '4Runner', 'Corolla', 'Celica', 'Other'],
+  Honda: ['Civic', 'Accord', 'S2000', 'CR-V', 'Ridgeline', 'CBR600RR', 'CBR1000RR', 'CB750', 'CB500F', 'CRF450', 'Other'],
+  Dodge: ['Ram 1500', 'Ram 2500', 'Charger', 'Challenger', 'Dakota', 'Viper', 'Other'],
+  Jeep: ['Cherokee', 'Grand Cherokee', 'Wrangler', 'Comanche', 'Gladiator', 'Other'],
+  BMW: ['E30', 'E36', 'E46', 'E90', 'M3', 'M5', 'S1000RR', 'R1250GS', 'F800GS', 'Other'],
+  'Mercedes-Benz': ['190E', 'C-Class', 'E-Class', 'SL', 'Other'],
+  Subaru: ['Impreza', 'WRX', 'WRX STI', 'BRZ', 'Forester', 'Legacy', 'Other'],
+  Mazda: ['MX-5 Miata', 'RX-7', 'RX-8', 'Mazdaspeed3', 'Other'],
+  Mitsubishi: ['Lancer Evo', 'Eclipse', '3000GT', 'Galant VR-4', 'Other'],
+  Ram: ['1500', '2500', '3500', 'Other'],
+  GMC: ['Sierra 1500', 'Sierra 2500', 'Canyon', 'Jimmy', 'Other'],
+  // Motorcycles
+  Yamaha: ['YZF-R1', 'YZF-R6', 'MT-07', 'MT-09', 'FZ1', 'FZ-09', 'V-Star 650', 'YZ450F', 'WR450F', 'Other'],
+  Kawasaki: ['ZX-6R', 'ZX-10R', 'Ninja 400', 'Ninja 650', 'Z900', 'Z650', 'Vulcan 900', 'KX450', 'Other'],
+  Suzuki: ['GSX-R600', 'GSX-R750', 'GSX-R1000', 'SV650', 'DR-Z400', 'Hayabusa', 'Other'],
+  Ducati: ['Monster 821', 'Monster 1200', 'Panigale V4', '916', '998', 'Streetfighter V4', 'Other'],
+  'Harley-Davidson': ['Sportster 883', 'Sportster 1200', 'Dyna Street Bob', 'Softail', 'Road King', 'Street Glide', 'Other'],
+  KTM: ['390 Duke', '690 Duke', '1290 Super Duke R', 'RC 390', '450 EXC-F', '500 EXC-F', 'Other'],
+  'Royal Enfield': ['Bullet 500', 'Continental GT 650', 'Interceptor 650', 'Himalayan', 'Meteor 350', 'Other'],
+  Triumph: ['Bonneville T120', 'Street Triple R', 'Tiger 900', 'Speed Triple 1200', 'Thruxton', 'Other'],
+  // UTVs
+  Polaris: ['RZR XP 1000', 'RZR Pro XP', 'RZR XP Turbo', 'Ranger 1000', 'General 1000', 'Other'],
+  'Can-Am': ['Maverick X3', 'Maverick Sport', 'Defender HD10', 'Commander XT', 'Other'],
+  'Arctic Cat': ['Wildcat XX', 'Alterra 700', 'Alterra 1000', 'Other'],
+  Textron: ['Havoc X', 'Stampede 900', 'Wildcat XX', 'Other'],
+  // Boats
+  Mercury: ['60hp', '115hp', '150hp', '200hp', '250hp', '300hp', 'Other'],
+  MerCruiser: ['4.3L V6', '5.0L V8', '6.2L V8', 'Other'],
+  'Volvo Penta': ['D3', 'D4', 'D6', 'IPS Drive', 'Other'],
+  Evinrude: ['90hp E-TEC', '115hp E-TEC', '150hp E-TEC', '200hp E-TEC', 'Other'],
+  'Boston Whaler': ['130 Super Sport', '170 Montauk', '210 Montauk', '270 Dauntless', 'Other'],
+  'Sea Ray': ['SPX 190', 'SPX 210', 'SLX 280', 'Sundancer 350', 'Other'],
+  Other: ['Custom', 'Other'],
+}
+const partCategoriesByVehicleType = {
+  Car: ['Engine', 'Fuel System', 'Turbo System', 'Cooling', 'ECU / Wiring', 'Sensors', 'Suspension', 'Brakes', 'Body', 'Interior', 'Exhaust', 'General'],
+  Truck: ['Engine', 'Fuel System', 'Turbo System', 'Cooling', 'ECU / Wiring', 'Sensors', 'Suspension', 'Brakes', 'Body', 'Interior', 'Exhaust', 'General'],
+  Motorcycle: ['Engine', 'Fuel/Carb', 'Suspension/Forks', 'Chain/Sprockets', 'Brakes', 'Bodywork/Fairings', 'Electrical', 'Exhaust'],
+  UTV: ['Engine', 'Fuel System', 'Driveline', 'Suspension', 'Brakes', 'Electrical', 'Safety Cage', 'Cooling', 'General'],
+  Boat: ['Engine', 'Fuel System', 'Electrical', 'Cooling', 'Propulsion', 'Hull/Deck', 'Rigging', 'General'],
+}
+const pinTypes = ['Analog 0-5V', 'Analog NTC', 'Digital input', 'Digital output', 'Ground', '5V reference', 'PWM output', 'Injector output', 'Ignition output', 'Other']
+const tuneStatuses = ['Testing', 'Approved', 'Archived']
+const ecuPlatforms = ['Speeduino', 'Haltech', 'Link G4X', 'Motec', 'Power Commander', 'Bazzaz', 'Woolich Racing', 'AEM', 'MegaSquirt', 'Other']
+const tuneTypes = ['Base Map', 'Street', 'Track', 'WOT Pull', 'E85', 'Flex Fuel', 'Dyno Pull', 'Other']
+const partSources = ['OEM', 'OE Replacement', 'Aftermarket', 'Fabricated', 'Junkyard/Pull']
+const buildStatuses = ['Planning', 'In Progress', 'Waiting', 'Delivered']
+const portalStatuses = ['Not invited', 'Invite pending', 'Portal active', 'Portal paused']
+const logChannelSuggestions = ['RPM', 'MAP', 'TPS', 'AFR', 'Lambda', 'IAT', 'CLT', 'Ignition Advance', 'Injector PW', 'Battery Voltage']
+const chartColors = ['#f97316', '#6aa7ff', '#52d08d', '#f2c078']
+
+const money = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+})
+
+function cloneWorkspace(data) {
+  return JSON.parse(JSON.stringify(data))
+}
+
+function makeId(_prefix) {
+  return crypto.randomUUID()
+}
+
+function slugify(value) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+}
+
+function formatDate(value) {
+  if (!value) return 'No date'
+  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function formatDateTime(value) {
+  if (!value) return 'No activity yet'
+  return new Date(value).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
+function totalPartsCost(parts) {
+  return parts.reduce((sum, part) => sum + Number(part.unitCost || 0) * Number(part.qty || 0), 0)
+}
+
+function totalLaborCost(entries) {
+  return entries.reduce((sum, entry) => sum + Number(entry.hours || 0) * Number(entry.rate || 0), 0)
+}
+
+function getMetrics(build) {
+  const installed = build.parts.filter((part) => part.status === 'installed').length
+  const ordered = build.parts.filter((part) => ['quoted', 'ordered', 'received'].includes(part.status)).length
+  const verified = build.pins.filter((pin) => pin.verified).length
+  const totalPhases = build.phases.length || 1
+  const complete = build.phases.filter((phase) => phase.done).length
+
+  return {
+    installed,
+    ordered,
+    verified,
+    spend: totalPartsCost(build.parts),
+    completion: Math.round((complete / totalPhases) * 100),
+  }
+}
+
+function statusClass(status) {
+  if (['installed', 'active', 'approved', 'done'].includes(String(status).toLowerCase())) return 'good'
+  if (['blocked', 'on hold'].includes(String(status).toLowerCase())) return 'bad'
+  if (['quoted', 'ordered', 'received', 'testing', 'in_progress'].includes(String(status).toLowerCase())) return 'warn'
+  return 'neutral'
+}
+
+function getVehicleLabel(build) {
+  if (build.vehicleYear || build.vehicleMake || build.vehicleModel) {
+    return [build.vehicleYear, build.vehicleMake, build.vehicleModel].filter(Boolean).join(' ') || 'Year Make Model'
+  }
+  return build.vehicle || 'Year Make Model'
+}
+
+function getMakeOptions(vehicleType) {
+  return makesByVehicleType[vehicleType] || makesByVehicleType.Car
+}
+
+function getModelOptions(make) {
+  return modelsByMake[make] || ['Custom', 'Other']
+}
+
+function getPartCategoryOptions(vehicleType) {
+  return partCategoriesByVehicleType[vehicleType] || partCategoriesByVehicleType.Truck
+}
+
+function parseDelimitedLine(line, delimiter) {
   const values = []
   let current = ''
   let inQuotes = false
