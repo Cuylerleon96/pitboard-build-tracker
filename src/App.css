@@ -63,7 +63,8 @@
 .mode-pill,
 .button {
   border-radius: 999px;
-  padding: 10px 16px;
+  padding: 12px 18px;
+  min-height: 44px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
@@ -104,7 +105,8 @@
 }
 
 .button.small {
-  padding: 7px 12px;
+  padding: 9px 12px;
+  min-height: 36px;
 }
 
 .google-button {
@@ -238,7 +240,7 @@ td span {
 }
 
 .billing-current-badge {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -340,19 +342,19 @@ td span {
 }
 
 .form-grid.three {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .form-grid.four {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .form-grid.five {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .form-grid.six {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .card-title {
@@ -587,6 +589,19 @@ label {
   .top-nav {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  /* Reduce 6-column forms to 2-3 columns on medium screens */
+  .form-grid.six {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .form-grid.five {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .form-grid.four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -614,6 +629,82 @@ label {
   .auth-tabs,
   .top-nav {
     grid-template-columns: 1fr;
+  }
+
+  /* Stack 6-column forms to single column on small mobile */
+  .form-grid.six,
+  .form-grid.five,
+  .form-grid.four,
+  .form-grid.three,
+  .form-grid.two {
+    grid-template-columns: 1fr;
+  }
+
+  /* Ensure button touch targets stay adequate */
+  .button,
+  .auth-tab,
+  .mode-pill,
+  .top-nav-button {
+    padding: 14px 18px;
+    min-height: 48px;
+  }
+
+  /* Simplify header on mobile - reduce size and spacing */
+  .header-main {
+    gap: 12px;
+    align-items: center;
+  }
+
+  .header-main h1 {
+    font-size: clamp(1.5rem, 5vw, 2rem);
+    margin: 8px 0;
+  }
+
+  .header-actions {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .header-subtitle {
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+
+  /* Reduce stat bar density on mobile */
+  .stat-bar {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .stat-item {
+    padding: 10px;
+  }
+
+  .stat-item span {
+    font-size: 0.78rem;
+  }
+
+  .stat-item strong {
+    font-size: 1.1rem;
+  }
+
+  /* Increase base font size for readability */
+  .field-label,
+  .auth-status,
+  .header-subtitle,
+  .summary-list span,
+  .journal-date,
+  .info-line,
+  .settings-copy p,
+  .build-row span,
+  td span,
+  .pill,
+  .connector-chip-desc,
+  .dashboard-task-note,
+  .task-card-meta {
+    font-size: 0.88rem;
   }
 }
 
@@ -674,7 +765,7 @@ label {
 }
 
 .task-expand-icon {
-  font-size: 0.7rem;
+  font-size: 0.82rem;
   color: var(--text-soft);
 }
 
@@ -872,7 +963,7 @@ label {
 
 .wire-endpoint-label {
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-soft);
@@ -920,12 +1011,12 @@ label {
 
 .connector-chip-desc {
   color: var(--text-soft);
-  font-size: 0.78rem;
+  font-size: 0.85rem;
 }
 
 .connector-chip-count {
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   color: var(--accent-strong);
   background: rgba(249, 115, 22, 0.12);
   border-radius: 999px;
@@ -1008,7 +1099,7 @@ label {
 
 .connector-table th {
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-soft);
@@ -1020,10 +1111,10 @@ label {
 
 .connector-tag {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 999px;
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   background: rgba(255, 255, 255, 0.07);
   color: var(--text-soft);
 }
