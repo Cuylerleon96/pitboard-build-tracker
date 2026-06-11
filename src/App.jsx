@@ -1322,7 +1322,7 @@ function App() {
   function updatePhase(phaseId, key, value) {
     updateActiveBuild((build) => ({
       ...build,
-      phases: build.phases.map((phase) => (phase.id === phaseId ? { blockedOn: '', ...phase, [key]: value } : phase)),
+      phases: build.phases.map((phase) => (phase.id === phaseId ? { ...phase, [key]: value } : phase)),
       updatedAt: new Date().toISOString(),
     }))
   }
