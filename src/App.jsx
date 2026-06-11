@@ -1314,7 +1314,6 @@ function App() {
   }
   return (
     <AppProvider value={contextValue}>
-return (
     <div className="workspace-shell">
       <header className="app-header">
         <div className="header-main">
