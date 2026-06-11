@@ -67,7 +67,7 @@ export async function requestMagicLink(email) {
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: window.location.origin,
+      emailRedirectTo: `${window.location.origin}/pitboard-build-tracker/`,
     },
   })
 
@@ -88,7 +88,7 @@ export async function signUpWithPassword(email, password) {
     email,
     password,
     options: {
-      emailRedirectTo: window.location.origin,
+      emailRedirectTo: `${window.location.origin}/pitboard-build-tracker/`,
     },
   })
   if (error) return { ok: false, message: error.message }
@@ -100,7 +100,7 @@ export async function signInWithGoogle() {
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: window.location.origin,
+      redirectTo: `${window.location.origin}/pitboard-build-tracker/`,
     },
   })
   if (error) return { ok: false, message: error.message }
