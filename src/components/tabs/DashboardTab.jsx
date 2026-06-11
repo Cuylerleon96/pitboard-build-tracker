@@ -6,6 +6,7 @@ import TechnicianNotes from '../TechnicianNotes'
 export default function DashboardTab() {
   const {
     activeBuild, isShop, metrics, money: moneyFmt,
+    hasShopTier, laborSpend,
     updatePhase, setActiveTab, setExpandedTaskId,
     techDrafts, setTechDrafts, addTechnicianNote, deleteTechnicianNote,
   } = useApp()
