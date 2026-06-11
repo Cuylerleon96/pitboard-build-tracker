@@ -153,7 +153,7 @@ export async function loadWorkspace(userId) {
           updatedAt: row.updated_at,
           budget: { target: row.budget_target },
           client: row.client,
-          phases: row.data?.phases?.map((phase) => ({ blockedOn: '', ...phase })) ?? [],
+          phases: row.data?.phases ?? [],
           parts: row.data?.parts?.map((part) => ({
             vendor: '',
             supplier: '',
@@ -226,6 +226,15 @@ export async function loadWorkspace(userId) {
 
 export function saveWorkspaceLocal(workspace) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace))
+}
+
+// Debounced version — delays the save until 300ms of inactivity
+let _localSaveTimer = null
+export function saveWorkspaceLocalDebounced(workspace) {
+  window.clearTimeout(_localSaveTimer)
+  _localSaveTimer = window.setTimeout(() => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace))
+  }, 300)
 }
 
 export async function getProfile(userId) {

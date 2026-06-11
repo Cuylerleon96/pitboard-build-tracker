@@ -12,9 +12,8 @@ import {
   listProfiles,
   loadWorkspace,
   openBillingPortal,
-  saveBuild,
   queueSave,
-  saveWorkspaceLocal,
+  saveWorkspaceLocalDebounced,
   signInWithGoogle,
   signInWithPassword,
   signOut,
@@ -23,254 +22,45 @@ import {
   updateProfileByAdmin,
   upsertProfile,
 } from './lib/dataClient'
-
-const partsStatuses = ['planned', 'quoted', 'ordered', 'received', 'installed', 'blocked']
-const tabs = ['dashboard', 'builds', 'tasks', 'parts', 'wiring', 'tunes', 'labor', 'journal', 'settings']
-const customerTabs = ['dashboard', 'parts', 'wiring', 'tunes', 'journal', 'settings']
-const taskStatuses = ['open', 'in_progress', 'done']
-const roles = ['shop', 'customer']
-const tiers = ['free', 'garage', 'shop']
-const vehicleTypes = ['Car', 'Truck', 'Motorcycle', 'UTV', 'Boat']
-const years = Array.from({ length: 48 }, (_, index) => String(new Date().getFullYear() + 1 - index))
-const makesByVehicleType = {
-  Car: ['Nissan', 'Ford', 'Chevrolet', 'Toyota', 'Honda', 'Dodge', 'Jeep', 'BMW', 'Mercedes-Benz', 'Subaru', 'Mazda', 'Mitsubishi', 'Other'],
-  Truck: ['Nissan', 'Ford', 'Chevrolet', 'Toyota', 'Honda', 'Dodge', 'Ram', 'GMC', 'Other'],
-  Motorcycle: ['Yamaha', 'Honda', 'Kawasaki', 'Suzuki', 'Ducati', 'Harley-Davidson', 'BMW', 'KTM', 'Royal Enfield', 'Triumph', 'Other'],
-  UTV: ['Polaris', 'Can-Am', 'Yamaha', 'Honda', 'Kawasaki', 'Arctic Cat', 'Textron', 'Other'],
-  Boat: ['Yamaha', 'Mercury', 'MerCruiser', 'Volvo Penta', 'Evinrude', 'Boston Whaler', 'Sea Ray', 'Other'],
-}
-const modelsByMake = {
-  // Cars / Trucks
-  Nissan: ['D21 Pickup', '240SX', '300ZX', '350Z', '370Z', 'Frontier', 'Pathfinder', 'Hardbody', 'Other'],
-  Ford: ['Mustang', 'F-150', 'F-250', 'Ranger', 'Bronco', 'Focus', 'Fusion', 'Other'],
-  Chevrolet: ['C10', 'C/K 1500', 'Silverado', 'Camaro', 'Corvette', 'S10', 'Blazer', 'Other'],
-  Toyota: ['Tacoma', 'Hilux', 'Tundra', 'Supra', '4Runner', 'Corolla', 'Celica', 'Other'],
-  Honda: ['Civic', 'Accord', 'S2000', 'CR-V', 'Ridgeline', 'CBR600RR', 'CBR1000RR', 'CB750', 'CB500F', 'CRF450', 'Other'],
-  Dodge: ['Ram 1500', 'Ram 2500', 'Charger', 'Challenger', 'Dakota', 'Viper', 'Other'],
-  Jeep: ['Cherokee', 'Grand Cherokee', 'Wrangler', 'Comanche', 'Gladiator', 'Other'],
-  BMW: ['E30', 'E36', 'E46', 'E90', 'M3', 'M5', 'S1000RR', 'R1250GS', 'F800GS', 'Other'],
-  'Mercedes-Benz': ['190E', 'C-Class', 'E-Class', 'SL', 'Other'],
-  Subaru: ['Impreza', 'WRX', 'WRX STI', 'BRZ', 'Forester', 'Legacy', 'Other'],
-  Mazda: ['MX-5 Miata', 'RX-7', 'RX-8', 'Mazdaspeed3', 'Other'],
-  Mitsubishi: ['Lancer Evo', 'Eclipse', '3000GT', 'Galant VR-4', 'Other'],
-  Ram: ['1500', '2500', '3500', 'Other'],
-  GMC: ['Sierra 1500', 'Sierra 2500', 'Canyon', 'Jimmy', 'Other'],
-  // Motorcycles
-  Yamaha: ['YZF-R1', 'YZF-R6', 'MT-07', 'MT-09', 'FZ1', 'FZ-09', 'V-Star 650', 'YZ450F', 'WR450F', 'Other'],
-  Kawasaki: ['ZX-6R', 'ZX-10R', 'Ninja 400', 'Ninja 650', 'Z900', 'Z650', 'Vulcan 900', 'KX450', 'Other'],
-  Suzuki: ['GSX-R600', 'GSX-R750', 'GSX-R1000', 'SV650', 'DR-Z400', 'Hayabusa', 'Other'],
-  Ducati: ['Monster 821', 'Monster 1200', 'Panigale V4', '916', '998', 'Streetfighter V4', 'Other'],
-  'Harley-Davidson': ['Sportster 883', 'Sportster 1200', 'Dyna Street Bob', 'Softail', 'Road King', 'Street Glide', 'Other'],
-  KTM: ['390 Duke', '690 Duke', '1290 Super Duke R', 'RC 390', '450 EXC-F', '500 EXC-F', 'Other'],
-  'Royal Enfield': ['Bullet 500', 'Continental GT 650', 'Interceptor 650', 'Himalayan', 'Meteor 350', 'Other'],
-  Triumph: ['Bonneville T120', 'Street Triple R', 'Tiger 900', 'Speed Triple 1200', 'Thruxton', 'Other'],
-  // UTVs
-  Polaris: ['RZR XP 1000', 'RZR Pro XP', 'RZR XP Turbo', 'Ranger 1000', 'General 1000', 'Other'],
-  'Can-Am': ['Maverick X3', 'Maverick Sport', 'Defender HD10', 'Commander XT', 'Other'],
-  'Arctic Cat': ['Wildcat XX', 'Alterra 700', 'Alterra 1000', 'Other'],
-  Textron: ['Havoc X', 'Stampede 900', 'Wildcat XX', 'Other'],
-  // Boats
-  Mercury: ['60hp', '115hp', '150hp', '200hp', '250hp', '300hp', 'Other'],
-  MerCruiser: ['4.3L V6', '5.0L V8', '6.2L V8', 'Other'],
-  'Volvo Penta': ['D3', 'D4', 'D6', 'IPS Drive', 'Other'],
-  Evinrude: ['90hp E-TEC', '115hp E-TEC', '150hp E-TEC', '200hp E-TEC', 'Other'],
-  'Boston Whaler': ['130 Super Sport', '170 Montauk', '210 Montauk', '270 Dauntless', 'Other'],
-  'Sea Ray': ['SPX 190', 'SPX 210', 'SLX 280', 'Sundancer 350', 'Other'],
-  Other: ['Custom', 'Other'],
-}
-const partCategoriesByVehicleType = {
-  Car: ['Engine', 'Fuel System', 'Turbo System', 'Cooling', 'ECU / Wiring', 'Sensors', 'Suspension', 'Brakes', 'Body', 'Interior', 'Exhaust', 'General'],
-  Truck: ['Engine', 'Fuel System', 'Turbo System', 'Cooling', 'ECU / Wiring', 'Sensors', 'Suspension', 'Brakes', 'Body', 'Interior', 'Exhaust', 'General'],
-  Motorcycle: ['Engine', 'Fuel/Carb', 'Suspension/Forks', 'Chain/Sprockets', 'Brakes', 'Bodywork/Fairings', 'Electrical', 'Exhaust'],
-  UTV: ['Engine', 'Fuel System', 'Driveline', 'Suspension', 'Brakes', 'Electrical', 'Safety Cage', 'Cooling', 'General'],
-  Boat: ['Engine', 'Fuel System', 'Electrical', 'Cooling', 'Propulsion', 'Hull/Deck', 'Rigging', 'General'],
-}
-const pinTypes = ['Analog 0-5V', 'Analog NTC', 'Digital input', 'Digital output', 'Ground', '5V reference', 'PWM output', 'Injector output', 'Ignition output', 'Other']
-const tuneStatuses = ['Testing', 'Approved', 'Archived']
-const ecuPlatforms = ['Speeduino', 'Haltech', 'Link G4X', 'Motec', 'Power Commander', 'Bazzaz', 'Woolich Racing', 'AEM', 'MegaSquirt', 'Other']
-const tuneTypes = ['Base Map', 'Street', 'Track', 'WOT Pull', 'E85', 'Flex Fuel', 'Dyno Pull', 'Other']
-const partSources = ['OEM', 'OE Replacement', 'Aftermarket', 'Fabricated', 'Junkyard/Pull']
-const buildStatuses = ['Planning', 'In Progress', 'Waiting', 'Delivered']
-const portalStatuses = ['Not invited', 'Invite pending', 'Portal active', 'Portal paused']
-const logChannelSuggestions = ['RPM', 'MAP', 'TPS', 'AFR', 'Lambda', 'IAT', 'CLT', 'Ignition Advance', 'Injector PW', 'Battery Voltage']
-const chartColors = ['#f97316', '#6aa7ff', '#52d08d', '#f2c078']
-
-const money = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  maximumFractionDigits: 0,
-})
-
-function cloneWorkspace(data) {
-  return JSON.parse(JSON.stringify(data))
-}
-
-function makeId(_prefix) {
-  return crypto.randomUUID()
-}
-
-function slugify(value) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
-}
-
-function formatDate(value) {
-  if (!value) return 'No date'
-  return new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function formatDateTime(value) {
-  if (!value) return 'No activity yet'
-  return new Date(value).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
-}
-
-function totalPartsCost(parts) {
-  return parts.reduce((sum, part) => sum + Number(part.unitCost || 0) * Number(part.qty || 0), 0)
-}
-
-function totalLaborCost(entries) {
-  return entries.reduce((sum, entry) => sum + Number(entry.hours || 0) * Number(entry.rate || 0), 0)
-}
-
-function getMetrics(build) {
-  const installed = build.parts.filter((part) => part.status === 'installed').length
-  const ordered = build.parts.filter((part) => ['quoted', 'ordered', 'received'].includes(part.status)).length
-  const verified = build.pins.filter((pin) => pin.verified).length
-  const totalPhases = build.phases.length || 1
-  const complete = build.phases.filter((phase) => phase.done).length
-
-  return {
-    installed,
-    ordered,
-    verified,
-    spend: totalPartsCost(build.parts),
-    completion: Math.round((complete / totalPhases) * 100),
-  }
-}
-
-function statusClass(status) {
-  if (['installed', 'active', 'approved', 'done'].includes(String(status).toLowerCase())) return 'good'
-  if (['blocked', 'on hold'].includes(String(status).toLowerCase())) return 'bad'
-  if (['quoted', 'ordered', 'received', 'testing', 'in_progress'].includes(String(status).toLowerCase())) return 'warn'
-  return 'neutral'
-}
-
-function getVehicleLabel(build) {
-  if (build.vehicleYear || build.vehicleMake || build.vehicleModel) {
-    return [build.vehicleYear, build.vehicleMake, build.vehicleModel].filter(Boolean).join(' ') || 'Year Make Model'
-  }
-  return build.vehicle || 'Year Make Model'
-}
-
-function getMakeOptions(vehicleType) {
-  return makesByVehicleType[vehicleType] || makesByVehicleType.Car
-}
-
-function getModelOptions(make) {
-  return modelsByMake[make] || ['Custom', 'Other']
-}
-
-function getPartCategoryOptions(vehicleType) {
-  return partCategoriesByVehicleType[vehicleType] || partCategoriesByVehicleType.Truck
-}
-
-function parseDelimitedLine(line, delimiter) {
-  const values = []
-  let current = ''
-  let inQuotes = false
-
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index]
-    const nextChar = line[index + 1]
-
-    if (char === '"') {
-      if (inQuotes && nextChar === '"') {
-        current += '"'
-        index += 1
-      } else {
-        inQuotes = !inQuotes
-      }
-      continue
-    }
-
-    if (char === delimiter && !inQuotes) {
-      values.push(current)
-      current = ''
-      continue
-    }
-
-    current += char
-  }
-
-  values.push(current)
-  return values.map((value) => value.trim())
-}
-
-function detectDelimiter(text) {
-  const sample = text.split(/\r?\n/).find((line) => line.trim())
-  if (!sample) return ','
-  const commaCount = (sample.match(/,/g) || []).length
-  const semicolonCount = (sample.match(/;/g) || []).length
-  if (!commaCount && !semicolonCount) return ''
-  return semicolonCount > commaCount ? ';' : ','
-}
-
-function parseDataLogText(text, delimiter) {
-  const lines = text.split(/\r?\n/).filter((line) => line.trim())
-  if (lines.length < 2) return { headers: [], rows: [] }
-  const headers = parseDelimitedLine(lines[0], delimiter)
-  const rows = lines.slice(1).map((line) => {
-    const values = parseDelimitedLine(line, delimiter)
-    return headers.reduce((accumulator, header, index) => {
-      accumulator[header] = values[index] ?? ''
-      return accumulator
-    }, {})
-  })
-  return { headers, rows }
-}
-
-function detectTimeColumn(headers, rows) {
-  const byName = headers.find((header) => /^(time|seconds|sec|timestamp)$/i.test(header))
-  if (byName) return byName
-  const firstHeader = headers[0]
-  if (!firstHeader) return ''
-  const numericEnough = rows.slice(0, 8).every((row) => Number.isFinite(Number(row[firstHeader])))
-  return numericEnough ? firstHeader : ''
-}
-
-function normalizeChannelName(channel) {
-  return channel.toLowerCase().replace(/[^a-z0-9]+/g, '')
-}
-
-function getSuggestedChannels(headers) {
-  const suggestions = logChannelSuggestions
-    .map((suggestion) => headers.find((header) => normalizeChannelName(header).includes(normalizeChannelName(suggestion))))
-    .filter(Boolean)
-
-  return [...new Set(suggestions)].slice(0, 4)
-}
-
-function getFileDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
-}
-
-function getEmptyTechnicianNotes() {
-  return { dashboard: [], parts: [], wiring: [], tunes: [], journal: [] }
-}
-
-function getAuthDisplayName(user) {
-  return user?.user_metadata?.full_name || user?.user_metadata?.name || ''
-}
+import {
+  partsStatuses,
+  tabs,
+  customerTabs,
+  taskStatuses,
+  roles,
+  vehicleTypes,
+  years,
+  pinTypes,
+  tuneStatuses,
+  ecuPlatforms,
+  tuneTypes,
+  partSources,
+  buildStatuses,
+  portalStatuses,
+  chartColors,
+  money,
+  cloneWorkspace,
+  makeId,
+  slugify,
+  formatDate,
+  formatDateTime,
+  totalLaborCost,
+  getMetrics,
+  statusClass,
+  getVehicleLabel,
+  getMakeOptions,
+  getModelOptions,
+  getPartCategoryOptions,
+  detectDelimiter,
+  parseDataLogText,
+  detectTimeColumn,
+  getSuggestedChannels,
+  getFileDataUrl,
+  getEmptyTechnicianNotes,
+  summarizeTuneImport,
+  getAuthDisplayName,
+} from './constants'
+import AppSelect from './components/AppSelect'
 
 const emptyBuild = {
   id: 'empty-build',
@@ -298,26 +88,6 @@ const emptyBuild = {
   journal: [],
 }
 
-function extractTuneValue(text, key) {
-  const match = text.match(new RegExp(`^${key}\\s*=\\s*([^\\r\\n]+)`, 'm'))
-  return match ? match[1].trim() : ''
-}
-
-function summarizeTuneImport(fileName, text) {
-  const importantKeys = ['nCylinders', 'engineType', 'reqFuel', 'fuelAlgorithm', 'sparkMode', 'egoAlgorithm']
-  const detected = importantKeys
-    .map((key) => [key, extractTuneValue(text, key)])
-    .filter(([, value]) => value)
-
-  const versionMatch = fileName.match(/v\d+(?:\.\d+)+|v\d+/i)
-
-  return {
-    version: versionMatch?.[0] || '',
-    name: fileName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' '),
-    summary: detected.map(([key, value]) => `${key}: ${value}`).join(' | '),
-  }
-}
-
 function TechnicianNotes({ entries, draft, onChange, onSubmit, onDelete, title }) {
   return (
     <article className="card">
@@ -342,70 +112,6 @@ function TechnicianNotes({ entries, draft, onChange, onSubmit, onDelete, title }
         )}
       </div>
     </article>
-  )
-}
-
-/* ── Custom Select — replaces native <AppSelect> so the popup is always dark ── */
-function AppSelect({ value, onChange, disabled, className, style, onClick, children }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-
-  // Parse <option> children into {value, label, disabled} objects
-  const options = []
-  ;(Array.isArray(children) ? children.flat() : [children]).forEach((child) => {
-    if (!child || child.type !== 'option') return
-    options.push({
-      value: child.props.value !== undefined ? child.props.value : child.props.children,
-      label: child.props.children,
-      disabled: child.props.disabled || false,
-    })
-  })
-
-  const selectedLabel = options.find((o) => String(o.value) === String(value ?? ''))?.label ?? value ?? ''
-
-  useEffect(() => {
-    if (!open) return
-    function handle(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
-    document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
-  }, [open])
-
-  function handleTrigger(e) {
-    if (onClick) onClick(e)
-    if (!disabled) setOpen((v) => !v)
-  }
-
-  function handlePick(opt, e) {
-    e.stopPropagation()
-    if (opt.disabled) return
-    onChange({ target: { value: opt.value } })
-    setOpen(false)
-  }
-
-  return (
-    <div
-      ref={ref}
-      className={`app-select${disabled ? ' app-select--disabled' : ''}${open ? ' app-select--open' : ''}${className ? ' ' + className : ''}`}
-      style={style}
-    >
-      <div className="app-select-trigger" onMouseDown={handleTrigger}>
-        <span className="app-select-value">{selectedLabel}</span>
-        <span className="app-select-arrow">{open ? '▴' : '▾'}</span>
-      </div>
-      {open && (
-        <div className="app-select-menu">
-          {options.map((opt, i) => (
-            <div
-              key={i}
-              className={`app-select-option${String(opt.value) === String(value ?? '') ? ' app-select-option--selected' : ''}${opt.disabled ? ' app-select-option--disabled' : ''}`}
-              onMouseDown={(e) => handlePick(opt, e)}
-            >
-              {opt.label}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
   )
 }
 
@@ -1206,7 +912,7 @@ function App() {
       return
     }
 
-    saveWorkspaceLocal(nextWorkspace)
+    saveWorkspaceLocalDebounced(nextWorkspace)
   }
 
   function updateActiveBuild(recipe) {
@@ -1267,7 +973,7 @@ function App() {
       return
     }
 
-    saveWorkspaceLocal(nextWorkspace)
+    saveWorkspaceLocalDebounced(nextWorkspace)
   }
 
   function updateBuildField(field, value) {
