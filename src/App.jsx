@@ -216,18 +216,27 @@ function App() {
 
     async function boot() {
       try {
-        const timeout = new Promise((_, reject) =>
+        // Wrap entire boot in a hard timeout so the app never stays stuck on loading
+        const hardTimeout = new Promise((_, reject) =>
+          window.setTimeout(() => reject(new Error('boot timeout')), 10000),
+        )
+
+        const sessionTimeout = new Promise((_, reject) =>
           window.setTimeout(() => reject(new Error('session timeout')), 6000),
         )
-        const session = await Promise.race([getSession(), timeout])
+
+        const session = await Promise.race([getSession(), sessionTimeout])
         if (ignore) return
 
         if (session) {
-          await hydrateCloudSession(session)
+          await Promise.race([hydrateCloudSession(session), hardTimeout])
           return
         }
 
-        const [localWorkspace, nextHasShopAdmin] = await Promise.all([loadWorkspace(), getHasShopAdmin()])
+        const [localWorkspace, nextHasShopAdmin] = await Promise.race([
+          Promise.all([loadWorkspace(), getHasShopAdmin()]),
+          hardTimeout,
+        ])
         if (!ignore) {
           setWorkspace(localWorkspace)
           setActiveBuildId(localWorkspace.builds[0]?.id ?? demoWorkspace.builds[0].id)
